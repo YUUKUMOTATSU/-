@@ -430,6 +430,12 @@ const CATALOG = [
     { k: 'desk', name: '她的书桌', w: 1200, d: 600, h: 720, color: '#C9AD8A' },
     { k: 'shelf', name: '书架 60', w: 600, d: 260, h: 1500, color: '#A98462' },
     { k: 'rack', name: '晾衣架', w: 860, d: 480, h: 1500, color: '#B9BEC2' }] },
+  { cat: '以后可能用', items: [
+    { k: 'futon', name: '沙发床（展开）', w: 1160, d: 1900, h: 250, color: '#9AA3A8' },
+    { k: 'futon', name: '客用床垫', w: 1000, d: 2000, h: 100, color: '#E6E0D2' },
+    { k: 'crib', name: '婴儿床', w: 1240, d: 780, h: 1000, color: '#E8DCC8' },
+    { k: 'futon', name: '婴儿床垫', w: 700, d: 1200, h: 80, color: '#F1E6D6' },
+    { k: 'rug', name: '宝宝爬行垫', w: 1200, d: 1200, h: 15, color: '#C9D6B5' }] },
   { cat: '卧室', items: [
     { k: 'bed', name: '单人床', w: 970, d: 1950, h: 450, color: '#D9C7AE' },
     { k: 'bed', name: '双人床 1.5m', w: 1500, d: 2000, h: 450, color: '#D9C7AE' },
@@ -799,6 +805,7 @@ function symbol(it) {
     case 'shelf': for (let i = 1; i < 3; i++) s += `<line class="f-det" x1="${-hw}" y1="${-hd + d * i / 3}" x2="${hw}" y2="${-hd + d * i / 3}"/>`; break;
     case 'tv': s += `<rect class="f-detf" x="${-hw * .8}" y="${-hd + 40}" width="${w * .8}" height="60" style="fill:#222"/>`; break;
     case 'rack': s += `<line class="f-det" x1="${-hw}" y1="${-hd / 2}" x2="${hw}" y2="${-hd / 2}"/><line class="f-det" x1="${-hw}" y1="${hd / 2}" x2="${hw}" y2="${hd / 2}"/>`; break;
+    case 'crib': s += `<rect class="f-detf" x="${-hw + 50}" y="${-hd + 50}" width="${Math.max(0, w - 100)}" height="${Math.max(0, d - 100)}"/>`; for (let x = -hw + 120; x < hw - 60; x += 110) s += `<line class="f-det" x1="${x}" y1="${-hd}" x2="${x}" y2="${-hd + 50}"/><line class="f-det" x1="${x}" y1="${hd - 50}" x2="${x}" y2="${hd}"/>`; break;
     case 'mirror': s += `<line class="f-det" x1="${-hw * .7}" y1="${-hd * .25}" x2="${hw * .7}" y2="${-hd * .25}"/><circle class="f-det" r="${Math.min(hw, hd) * .25}"/>`; break;
     case 'speaker': s += `<circle class="f-det" cx="0" cy="${hd * .35}" r="${Math.min(hw, hd) * .55}"/>`; break;
     case 'plant': { const r = Math.min(w, d) * .3; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; s += `<line class="f-det" x1="0" y1="0" x2="${Math.cos(a) * r * 1.5}" y2="${Math.sin(a) * r * 1.5}"/>`; } break; }
@@ -1443,6 +1450,13 @@ const three = (() => {
         break; }
       case 'tv': { const sw = Math.min(W * .97, 1.12), sh = sw * .5625; add(W, H, D, 0, H / 2, 0, c); add(.3, .02, .2, 0, H + .01, 0, 0x2A2A2A); add(sw, sh, .04, 0, H + .06 + sh / 2, -D / 2 + .1, 0x1E1E1E); break; }
       case 'speaker': add(W, H, D, 0, H / 2, 0, c); break;
+      case 'crib': {
+        const p = .04, mh = Math.min(.45, H * .45);
+        for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(p, H, p, sx * (W / 2 - p / 2), H / 2, sz * (D / 2 - p / 2), c);
+        add(W - .02, .12, D - .02, 0, mh, 0, 0xF6F2EA);
+        for (const sz of [-1, 1]) { add(W, .035, .035, 0, H - .02, sz * (D / 2 - .02), c); for (let x = -W / 2 + .1; x < W / 2 - .05; x += .1) add(.018, H - mh - .06, .018, x, (mh + H) / 2, sz * (D / 2 - .02), c); }
+        for (const sx of [-1, 1]) add(.035, H - mh, D, sx * (W / 2 - .02), (mh + H) / 2, 0, c);
+        break; }
       case 'mirror': {
         const r = Math.min(W, D) / 2;
         const body = new T.Mesh(new T.CylinderGeometry(r, r, H, 28), mat(c)); body.position.y = H / 2; body.castShadow = true; g.add(body);
