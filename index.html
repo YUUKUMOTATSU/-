@@ -424,6 +424,7 @@ const CATALOG = [
     { k: 'cabinet', name: '微波炉架', w: 585, d: 390, h: 1500, color: '#9C8B76' },
     { k: 'tv', name: '电视柜+50寸电视', w: 1150, d: 310, h: 450, color: '#8C6B4F' },
     { k: 'speaker', name: '音响', w: 195, d: 265, h: 320, color: '#3B4347' },
+    { k: 'chair', name: '办公椅', w: 600, d: 600, h: 1100, color: '#3B4347' },
     { k: 'table', name: '折叠矮桌', w: 900, d: 600, h: 330, color: '#B99470' },
     { k: 'sofa', name: '无腿沙发', w: 1160, d: 660, h: 450, color: '#9AA3A8' },
     { k: 'desk', name: '她的书桌', w: 1200, d: 600, h: 720, color: '#C9AD8A' },
@@ -474,6 +475,7 @@ const SAMPLE = [
   { k: 'mirror', name: '旋转立镜', w: 450, d: 450, h: 1600, x: 4325, y: 3455, rot: 180, color: '#B99470' },
   // 和室① office + TV corner
   { k: 'desk', name: '办公桌', w: 1600, d: 800, h: 720, x: 6900, y: 6640, rot: 90, color: '#B99470' },
+  { k: 'chair', name: '办公椅', w: 600, d: 600, h: 1100, x: 6300, y: 6640, rot: 270, color: '#3B4347' },
   { k: 'shelf', name: '书架 90', w: 900, d: 350, h: 1800, x: 6790, y: 4005, rot: 0, color: '#A98462' },
   { k: 'speaker', name: '音响', w: 195, d: 265, h: 320, x: 7168, y: 4328, rot: 90, color: '#3B4347' },
   { k: 'tv', name: '电视柜+50寸电视', w: 1150, d: 310, h: 450, x: 7145, y: 5010, rot: 90, color: '#8C6B4F' },
@@ -484,10 +486,10 @@ const SAMPLE = [
   { k: 'cabinet', name: '洗碗机+碗架', w: 600, d: 460, h: 1300, x: 2470, y: 5290, rot: 270, color: '#ECEDEE' },
   { k: 'cabinet', name: '冰箱', w: 500, d: 580, h: 1300, x: 2530, y: 4730, rot: 270, color: '#E4E6E7' },
   { k: 'cabinet', name: '微波炉架', w: 585, d: 390, h: 1500, x: 2435, y: 4178, rot: 270, color: '#9C8B76' },
-  // 和室③ her desk + drying rack by the balcony
-  { k: 'desk', name: '她的书桌', w: 1200, d: 600, h: 720, x: 1840, y: 5700, rot: 90, color: '#C9AD8A' },
-  { k: 'shelf', name: '书架 60', w: 600, d: 260, h: 1500, x: 2010, y: 6650, rot: 90, color: '#A98462' },
-  { k: 'rack', name: '晾衣架', w: 860, d: 480, h: 1500, x: 340, y: 5930, rot: 90, color: '#B9BEC2' },
+  // 和室③ her desk under the west window, clear path from the door straight to the balcony
+  { k: 'desk', name: '她的书桌', w: 1200, d: 600, h: 720, x: 380, y: 6000, rot: 270, color: '#C9AD8A' },
+  { k: 'shelf', name: '书架 60', w: 600, d: 260, h: 1500, x: 2010, y: 5600, rot: 90, color: '#A98462' },
+  { k: 'rack', name: '晾衣架', w: 860, d: 480, h: 1500, x: 1900, y: 6830, rot: 90, color: '#B9BEC2' },
 ];
 
 /* ================= geometry ================= */
@@ -584,7 +586,7 @@ for (const p of PIECES) {
 }
 
 /* ================= state ================= */
-const LS_DRAFT = 'takasu203.draft.v2', LS_SCHEMES = 'takasu203.schemes.v1', LS_OPTS = 'takasu203.opts.v1';
+const LS_DRAFT = 'takasu203.draft.v3', LS_SCHEMES = 'takasu203.schemes.v1', LS_OPTS = 'takasu203.opts.v1';
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } };
 
