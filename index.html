@@ -1,0 +1,1512 @@
+<title>高洲新家布局</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600&display=swap">
+<style>
+/* Layout: a drafting desk. The plan sheet fills the left at true scale; a narrow parts drawer sits on the right and stacks under the sheet on phones. */
+:root{
+  --bg:#E8EBE6; --paper:#FAFAF6; --panel:#F3F4F0; --ink:#1E2829; --ink-2:#5A6563; --line:#CDD3CC;
+  --accent:#2C54A0; --accent-ink:#FFFFFF; --accent-soft:rgba(44,84,160,.12);
+  --warn:#AE6E14; --warn-soft:rgba(190,128,30,.16); --bad:#C0392B; --bad-soft:rgba(192,57,43,.13); --ok:#3B7A52;
+  --wall:#2A3436; --tatami:#E1E4C2; --tatami-line:#BEC48F; --wood:#EFE1CB; --wood-line:#E2CFB0;
+  --wet:#DEE8EC; --wet-line:#C8D7DC; --tile:#E5E6E1; --tile-line:#D3D5CE; --closet:#EAE6DD; --balcony:#E3E6E1;
+  --shared:#EEEFEB; --shared-line:#D6DAD4;
+  --f-display:"Noto Serif SC","Songti SC","STSong",serif;
+  --f-body:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1416; --paper:#172024; --panel:#131A1D; --ink:#E2E8E6; --ink-2:#98A4A2; --line:#2B363A;
+  --accent:#8CAAEC; --accent-ink:#0D1320; --accent-soft:rgba(140,170,236,.16);
+  --warn:#E3A84E; --warn-soft:rgba(227,168,78,.17); --bad:#F2806F; --bad-soft:rgba(242,128,111,.17); --ok:#7CC096;
+  --wall:#D4DCDA; --tatami:#343A29; --tatami-line:#4D5539; --wood:#3A3127; --wood-line:#4A3E31;
+  --wet:#22313A; --wet-line:#2E414B; --tile:#283033; --tile-line:#343E41; --closet:#2D2A25; --balcony:#20282A;
+  --shared:#1B2225; --shared-line:#283236; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0F1416; --paper:#172024; --panel:#131A1D; --ink:#E2E8E6; --ink-2:#98A4A2; --line:#2B363A;
+  --accent:#8CAAEC; --accent-ink:#0D1320; --accent-soft:rgba(140,170,236,.16);
+  --warn:#E3A84E; --warn-soft:rgba(227,168,78,.17); --bad:#F2806F; --bad-soft:rgba(242,128,111,.17); --ok:#7CC096;
+  --wall:#D4DCDA; --tatami:#343A29; --tatami-line:#4D5539; --wood:#3A3127; --wood-line:#4A3E31;
+  --wet:#22313A; --wet-line:#2E414B; --tile:#283033; --tile-line:#343E41; --closet:#2D2A25; --balcony:#20282A;
+  --shared:#1B2225; --shared-line:#283236; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr)}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0}
+.brand h1{font-family:var(--f-display);font-weight:600;font-size:21px;margin:0;letter-spacing:.04em;text-wrap:balance}
+.brand .meta{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);letter-spacing:.02em}
+.scheme-tag{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.scheme-tag b{color:var(--ink);font-weight:500}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;flex:none}
+.dot.dirty{background:var(--warn)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto}
+
+.btn{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:6px 11px;cursor:pointer;line-height:1.2;white-space:nowrap}
+.btn:hover{border-color:var(--ink-2)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad)}
+.btn.small{padding:4px 8px;font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--paper)}
+.seg button{border:0;background:transparent;padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+.work{display:grid;grid-template-columns:minmax(0,1fr) 352px;min-height:0}
+.stage{position:relative;min-height:0;overflow:hidden;background:var(--paper)}
+#plan{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#plan.dragging{cursor:grabbing}
+#view3d{position:absolute;inset:0;touch-action:none}
+#view3d canvas{display:block;width:100%;height:100%}
+
+.hud{position:absolute;display:flex;gap:6px;align-items:center;pointer-events:none}
+.hud > *{pointer-events:auto}
+.hud-tl{top:12px;left:12px;flex-wrap:wrap;right:12px}
+.hud-bl{bottom:12px;left:12px;flex-wrap:wrap;max-width:calc(100% - 150px)}
+.hud-br{bottom:12px;right:12px}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:5px 12px 5px 10px;font-size:13px;cursor:pointer}
+.chip .dot{width:8px;height:8px}
+.chip.bad .dot{background:var(--bad)} .chip.warn .dot{background:var(--warn)}
+.tog{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:4px 9px;font-size:13px;cursor:pointer}
+.tog input{margin:0;accent-color:var(--accent)}
+.zoom{display:inline-flex;border:1px solid var(--line);border-radius:6px;background:var(--paper);overflow:hidden}
+.zoom button{border:0;background:transparent;min-width:34px;height:32px;cursor:pointer;font-size:15px}
+.zoom button + button{border-left:1px solid var(--line)}
+.scale{display:inline-flex;flex-direction:column;gap:2px;font-family:var(--f-mono);font-size:11px;color:var(--ink-2);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+.scale i{display:block;height:5px;border:1.5px solid var(--ink);border-top:0}
+.hint3d{font-size:12px;color:var(--ink-2);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:5px 9px}
+
+.panel{background:var(--panel);border-left:1px solid var(--line);overflow:auto;min-height:0;display:flex;flex-direction:column}
+.sel{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--paper);display:grid;gap:10px}
+.sel-head{display:flex;gap:8px;align-items:center}
+.sel-head input{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--panel);font-weight:500}
+.sel-room{font-size:12px;color:var(--ink-2);white-space:nowrap}
+.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.field{display:grid;gap:3px;font-size:12px;color:var(--ink-2)}
+.field span{letter-spacing:.04em}
+.field .inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--panel);padding-right:7px}
+.field input{width:100%;min-width:0;border:0;background:transparent;padding:6px 4px 6px 8px;font-family:var(--f-mono);font-size:13px;color:var(--ink)}
+.field input:focus{outline:none}
+.field .inp:focus-within{border-color:var(--accent)}
+.field em{font-style:normal;font-size:11px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.row .grow{flex:1}
+.swatches{display:flex;gap:6px;flex-wrap:wrap}
+.swatches button{width:24px;height:24px;border-radius:50%;border:1px solid rgba(0,0,0,.18);cursor:pointer;padding:0}
+.swatches button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--accent)}
+.warns{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13px}
+.warns li{display:flex;gap:7px;align-items:baseline}
+.warns li::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;transform:translateY(-1px)}
+.warns li.bad::before{background:var(--bad)} .warns li.warn::before{background:var(--warn)} .warns li.ok::before{background:var(--ok)}
+
+.tabs{display:flex;gap:2px;padding:10px 12px 0;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
+.tabs button{border:0;background:transparent;padding:8px 10px 9px;cursor:pointer;color:var(--ink-2);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
+.pane{padding:14px 16px 24px;display:grid;gap:14px;align-content:start}
+.pane h3{margin:0;font-size:12px;letter-spacing:.08em;color:var(--ink-2);font-weight:500}
+.cats{display:flex;gap:6px;flex-wrap:wrap}
+.cats button{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:3px 11px;font-size:13px;cursor:pointer}
+.cats button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.lib{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.card{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:8px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;align-items:center;text-align:left;cursor:pointer}
+.card:hover{border-color:var(--ink-2)}
+.card svg{width:44px;height:44px}
+.card b{display:block;font-weight:500;font-size:13px;line-height:1.3}
+.card small{font-family:var(--f-mono);font-size:11px;color:var(--ink-2)}
+.custom{border:1px dashed var(--line);border-radius:8px;padding:12px;display:grid;gap:10px}
+.custom .fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+.txt{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--paper);min-width:0;width:100%}
+select.txt{padding:5px 6px}
+
+.list{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.list li{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.list li:hover{background:var(--paper)}
+.list li.on{border-color:var(--accent);background:var(--accent-soft)}
+.list .sw{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.2)}
+.list .nm{min-width:0}
+.list .nm b{font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .nm small{color:var(--ink-2);font-size:12px}
+.pill{font-size:11px;border-radius:999px;padding:1px 8px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.pill.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.pill.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.empty{color:var(--ink-2);font-size:13px;border:1px dashed var(--line);border-radius:8px;padding:14px}
+.note{font-size:12.5px;color:var(--ink-2)}
+.confirm{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;background:var(--bad-soft);border-radius:6px;padding:6px 8px}
+.schemes li{grid-template-columns:minmax(0,1fr) auto;cursor:default}
+.prose{font-size:13.5px;max-width:62ch}
+.prose p,.prose ul{margin:0 0 8px}
+.prose ul{padding-left:18px}
+.prose li{margin:2px 0}
+.prose code,.kbd{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--paper)}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;font-size:12.5px}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:16px;height:12px;border-radius:2px;border:1px solid var(--line);flex:none}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13px;z-index:20;max-width:calc(100% - 32px)}
+.modal{position:fixed;inset:0;background:rgba(10,14,16,.55);display:grid;place-items:center;z-index:30;padding:16px}
+.modal-box{background:var(--paper);border-radius:10px;padding:16px;max-width:min(920px,100%);max-height:100%;overflow:auto;display:grid;gap:10px}
+.modal-box img{border:1px solid var(--line);border-radius:6px;background:#fff}
+
+@media (max-width: 860px){
+  .app{height:auto;min-height:100%}
+  .work{grid-template-columns:minmax(0,1fr)}
+  .stage{height:64vh;min-height:380px}
+  .panel{border-left:0;border-top:1px solid var(--line);overflow:visible}
+  .tools{margin-left:0}
+  .hud-bl{max-width:calc(100% - 24px);bottom:56px}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>高洲新家布局</h1>
+      <span class="meta">3-3-5-203 · 3DK · 54㎡ · 2F</span>
+      <span class="scheme-tag"><span id="dirty-dot" class="dot"></span>方案 <b id="scheme-name">示例方案</b><span id="scheme-state"></span></span>
+    </div>
+    <div class="tools">
+      <button class="btn" id="undo" title="撤销 (Ctrl+Z)">撤销</button>
+      <button class="btn" id="redo" title="重做 (Ctrl+Shift+Z)">重做</button>
+      <div class="seg" role="group" aria-label="视图">
+        <button id="v2d" aria-pressed="true">平面 2D</button>
+        <button id="v3d" aria-pressed="false">立体 3D</button>
+      </div>
+      <button class="btn" id="export">导出图片</button>
+    </div>
+  </header>
+
+  <main class="work">
+    <section class="stage" id="stage">
+      <svg id="plan" xmlns="http://www.w3.org/2000/svg" aria-label="户型平面图">
+        <style id="svgcss"></style>
+        <defs id="defs"></defs>
+        <g id="g-floors"></g>
+        <g id="g-fix"></g>
+        <g id="g-walls"></g>
+        <g id="g-zones"></g>
+        <g id="g-labels"></g>
+        <g id="g-dims"></g>
+        <g id="g-furn"></g>
+        <g id="overlay"></g>
+      </svg>
+      <div id="view3d" hidden></div>
+
+      <div class="hud hud-tl">
+        <button class="chip" id="status"><span class="dot"></span><span id="status-text">没有冲突</span></button>
+      </div>
+      <div class="hud hud-bl" id="hud2d">
+        <label class="tog"><input type="checkbox" id="opt-snap" checked>吸附</label>
+        <label class="tog"><input type="checkbox" id="opt-dims" checked>距离标注</label>
+        <label class="tog"><input type="checkbox" id="opt-zones" checked>开门范围</label>
+        <div class="scale"><i id="scalebar" style="width:60px"></i><span>1 m</span></div>
+      </div>
+      <div class="hud hud-bl" id="hud3d" hidden>
+        <span class="hint3d">拖动旋转 · 滚轮或双指缩放 · 右键拖动平移</span>
+        <label class="tog"><input type="checkbox" id="opt-low">矮墙（看得更清楚）</label>
+      </div>
+      <div class="hud hud-br">
+        <div class="zoom">
+          <button id="zoom-out" aria-label="缩小">−</button>
+          <button id="zoom-fit" aria-label="适应窗口" style="font-size:13px;padding:0 8px">适应</button>
+          <button id="zoom-in" aria-label="放大">+</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel" id="panel">
+      <section class="sel" id="sel" hidden>
+        <div class="sel-head">
+          <input id="sel-name" aria-label="家具名称">
+          <span class="sel-room" id="sel-room"></span>
+        </div>
+        <div class="fields">
+          <label class="field"><span>宽</span><span class="inp"><input id="sel-w" type="number" min="5" step="1" inputmode="decimal"><em>cm</em></span></label>
+          <label class="field"><span>深</span><span class="inp"><input id="sel-d" type="number" min="5" step="1" inputmode="decimal"><em>cm</em></span></label>
+          <label class="field"><span>高</span><span class="inp"><input id="sel-h" type="number" min="1" step="1" inputmode="decimal"><em>cm</em></span></label>
+        </div>
+        <div class="row">
+          <label class="field" style="width:96px"><span>角度</span><span class="inp"><input id="sel-rot" type="number" step="1"><em>°</em></span></label>
+          <div class="row" style="align-self:end">
+            <button class="btn small" data-rot="-90">↺ 90°</button>
+            <button class="btn small" data-rot="90">↻ 90°</button>
+          </div>
+        </div>
+        <div class="swatches" id="sel-colors"></div>
+        <ul class="warns" id="sel-warn"></ul>
+        <div class="row">
+          <button class="btn small" id="sel-dup">复制</button>
+          <button class="btn small danger" id="sel-del">删除</button>
+          <span class="grow"></span>
+          <button class="btn small" id="sel-close">完成</button>
+        </div>
+      </section>
+
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="lib" aria-selected="true">家具库</button>
+        <button role="tab" data-tab="items" aria-selected="false">已摆放 <span id="count" class="num"></span></button>
+        <button role="tab" data-tab="schemes" aria-selected="false">方案</button>
+        <button role="tab" data-tab="help" aria-selected="false">说明</button>
+      </nav>
+
+      <section class="pane" data-pane="lib">
+        <div class="cats" id="cats"></div>
+        <div class="lib" id="lib"></div>
+        <p class="note">点一下放到画面中间，电脑上也可以直接拖进平面图。尺寸是常见规格，放好后在上方改成你自己家具的实际尺寸。</p>
+        <form class="custom" id="custom">
+          <h3>自定义家具</h3>
+          <input class="txt" id="c-name" placeholder="名称，例如：钢琴" required>
+          <div class="fields">
+            <label class="field"><span>宽</span><span class="inp"><input id="c-w" type="number" min="5" value="120" required><em>cm</em></span></label>
+            <label class="field"><span>深</span><span class="inp"><input id="c-d" type="number" min="5" value="60" required><em>cm</em></span></label>
+            <label class="field"><span>高</span><span class="inp"><input id="c-h" type="number" min="1" value="80" required><em>cm</em></span></label>
+          </div>
+          <div class="row">
+            <select class="txt" id="c-k" style="flex:1" aria-label="形状">
+              <option value="box">普通方块</option><option value="bed">床</option><option value="sofa">沙发</option>
+              <option value="table">桌子</option><option value="chair">椅子</option><option value="cabinet">柜子</option>
+              <option value="shelf">架子</option><option value="rug">地毯</option><option value="plant">绿植</option>
+            </select>
+            <button class="btn primary" type="submit">添加</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="pane" data-pane="items" hidden>
+        <ul class="list" id="items"></ul>
+        <div id="clear-wrap"></div>
+      </section>
+
+      <section class="pane" data-pane="schemes" hidden>
+        <div style="display:grid;gap:8px">
+          <h3>当前方案</h3>
+          <input class="txt" id="save-name" aria-label="方案名称" placeholder="方案名称">
+          <div class="row">
+            <button class="btn primary" id="save">保存</button>
+            <button class="btn" id="save-new">另存为新方案</button>
+          </div>
+          <p class="note" id="store-note">方案保存在这个浏览器里。</p>
+        </div>
+        <div style="display:grid;gap:8px">
+          <h3>已保存的方案</h3>
+          <ul class="list schemes" id="schemes"></ul>
+        </div>
+        <div class="row">
+          <button class="btn small" id="load-sample">载入示例方案</button>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="help" hidden>
+        <div class="prose">
+          <h3>户型数据从哪来</h3>
+          <p>按 UR 平面图「30239_高洲第一_3D_3DK」建模，单位毫米，尺寸是图上标注的墙中线尺寸。</p>
+          <ul>
+            <li><b>照图上数字画的</b>：外框 7,380 × 7,560，各房间分隔（2,190 / 2,400 / 2,790，1,140 / 1,350 / 1,200 / 2,700 / 990，3,780 / 3,780，1,850 / 1,930 / 990 / 2,790），阳台进深 1,100。</li>
+            <li><b>按图纸比例估的</b>（误差约 ±10–15 cm）：门窗的位置和宽度，浴室、厕所、洗面所、玄关之间的分隔，厨房台面长度，墙厚（外墙按 16 cm、内墙按 10 cm 算）。</li>
+          </ul>
+          <p>图纸上写着“图面与实际不同时以现状为准”。买大件之前，最好到现场量一下：和室①的净宽、厨房台面到对面隔扇的距离、洗衣机位置、各个门的宽度。</p>
+          <h3>怎么用</h3>
+          <ul>
+            <li>拖动家具移动，拖空白处平移，滚轮或双指缩放。</li>
+            <li>拖家具上方的圆点旋转（每 15° 吸附），拖四个角改尺寸。</li>
+            <li>选中家具后，会显示到四周墙面或家具的净距离（cm）。</li>
+            <li>红框是穿墙或重叠，橙框是挡住了门、推拉门或壁橱门。</li>
+            <li>快捷键：<span class="kbd">R</span> 转 90°，<span class="kbd">Delete</span> 删除，<span class="kbd">Ctrl+D</span> 复制，方向键微调 1 cm（加 Shift 10 cm），<span class="kbd">Ctrl+Z</span> 撤销。</li>
+          </ul>
+          <h3>图例</h3>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--tatami)"></i>榻榻米（和室）</span>
+          <span><i style="background:var(--wood)"></i>木地板</span>
+          <span><i style="background:var(--wet)"></i>浴室 / 厕所 / 洗面所</span>
+          <span><i style="background:var(--tile)"></i>玄关</span>
+          <span><i style="background:var(--closet)"></i>壁橱 / 储物</span>
+          <span><i style="background:var(--warn-soft)"></i>开门 / 推拉门范围</span>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div class="modal" id="modal" hidden><div class="modal-box"><div class="row"><b class="grow">长按或右键图片即可保存</b><button class="btn small" id="modal-close">关闭</button></div><img id="modal-img" alt="导出的布局图"></div></div>
+
+<script>
+(() => {
+'use strict';
+/* ================= plan data (mm, wall centrelines; X → right, Y → down; balcony faces SE) ================= */
+const EXT = 160, INT = 100, WALL_H = 2400;
+const R = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+
+function mats6(x0, y0, x1, y1) { // classic 6-mat layout
+  const W = x1 - x0, H = y1 - y0, S = W / 3, L = H / 2, T = H / 4, mx = (x0 + S + x1) / 2;
+  return [[x0, y0, x0 + S, y0 + L], [x0, y0 + L, x0 + S, y1], [x0 + S, y0, x1, y0 + T],
+    [x0 + S, y0 + T, mx, y0 + T + L], [mx, y0 + T, x1, y0 + T + L], [x0 + S, y0 + T + L, x1, y1]];
+}
+function mats3(x0, y0, x1, y1) {
+  const H = y1 - y0, mx = (x0 + x1) / 2, t = y0 + H / 3;
+  return [[x0, y0, x1, t], [x0, t, mx, y1], [mx, t, x1, y1]];
+}
+
+const ROOMS = [
+  { id: 'w1', name: '和室①', type: 'tatami', poly: R(4590, 3780, 7380, 7560), note: '6畳', mats: mats6(4640, 3830, 7300, 7480), lab: [5985, 5670] },
+  { id: 'w2', name: '和室②', type: 'tatami', poly: R(3690, 0, 6390, 3780), note: '6畳', mats: mats6(3740, 80, 6340, 3730), lab: [5040, 1890] },
+  { id: 'o2', name: '壁橱', type: 'closet', poly: R(6390, 0, 7380, 3780), lab: [6885, 1890], small: true },
+  { id: 'w3', name: '和室③', type: 'tatami', poly: R(0, 4770, 2190, 7560), note: '约3畳', mats: mats3(80, 4820, 2140, 7480), lab: [1095, 6165] },
+  { id: 'o3', name: '壁橱', type: 'closet', poly: R(0, 3780, 1140, 4770), lab: [570, 4275], small: true },
+  { id: 'dk', name: '餐厨 DK', type: 'wood', poly: R(2190, 3780, 4590, 7560), note: '约5.2畳', lab: [3740, 4500] },
+  { id: 'hall', name: '走廊', type: 'wood', poly: [[2190, 2450], [2490, 2450], [2490, 2600], [3690, 2600], [3690, 3780], [2190, 3780], [2190, 4770], [1140, 4770], [1140, 3450], [2040, 3450], [2190, 3300]], lab: [2990, 3190], small: true },
+  { id: 'gk', name: '玄关', type: 'tile', poly: [[1140, 2450], [2190, 2450], [2190, 3300], [2040, 3450], [1140, 3450]], lab: [1640, 2950], small: true },
+  { id: 'st', name: '储物', type: 'closet', poly: R(1140, 1850, 2490, 2450), lab: [1815, 2150], small: true },
+  { id: 'bath', name: '浴室', type: 'wet', poly: R(1140, 0, 2490, 1850), lab: [1815, 1250], small: true },
+  { id: 'wc', name: '厕所', type: 'wet', poly: R(2490, 0, 3690, 950), lab: [2720, 760], small: true },
+  { id: 'wash', name: '洗面所', type: 'wet', poly: R(2490, 950, 3690, 2600), lab: [2850, 1500], small: true },
+  { id: 'bal', name: '阳台', type: 'balcony', poly: R(0, 7560, 4590, 8660), lab: [2295, 8110] },
+  { id: 'stair', name: '楼梯间（公共）', type: 'shared', poly: R(0, 0, 1140, 3780), lab: [570, 3330], small: true, shared: true },
+];
+
+// ops: win(dow) / door / door2 (double) / slide / fold / open. f,to = along-wall coordinates.
+const WALLS = [
+  { a: [1140, 0], b: [7380, 0], t: EXT, ops: [
+    { k: 'win', f: 1650, to: 2150, sill: 1200, head: 1800 },
+    { k: 'win', f: 2850, to: 3350, sill: 1200, head: 1800 },
+    { k: 'win', f: 4400, to: 6200, sill: 850, head: 1850 }] },
+  { a: [7380, 0], b: [7380, 7560], t: EXT },
+  { a: [0, 7560], b: [7380, 7560], t: EXT, ops: [
+    { k: 'win', f: 450, to: 1950, sill: 0, head: 1800, full: true },
+    { k: 'win', f: 2950, to: 4450, sill: 0, head: 1800, full: true },
+    { k: 'win', f: 5000, to: 6800, sill: 800, head: 1800 }] },
+  { a: [0, 3780], b: [0, 7560], t: EXT, ops: [{ k: 'win', f: 5100, to: 7200, sill: 850, head: 1800 }] },
+  { a: [1140, 0], b: [1140, 3780], t: EXT, ops: [{ k: 'door', f: 2600, to: 3400, hinge: 'to', side: -1, lab: '入户门' }] },
+  { a: [0, 3780], b: [1140, 3780], t: EXT },
+  { a: [2490, 0], b: [2490, 2600], t: INT, ops: [{ k: 'fold', f: 1050, to: 1650, side: -1, lab: '浴室门' }] },
+  { a: [1140, 1850], b: [2490, 1850], t: INT },
+  { a: [1140, 2450], b: [2490, 2450], t: INT, ops: [{ k: 'door2', f: 1240, to: 2160, side: 1, lab: '储物柜门' }] },
+  { a: [2490, 950], b: [3690, 950], t: INT, ops: [{ k: 'door', f: 2560, to: 3160, hinge: 'from', side: 1, lab: '厕所门' }] },
+  { a: [2490, 2600], b: [3690, 2600], t: INT, ops: [{ k: 'open', f: 2560, to: 3620 }] },
+  { a: [3690, 0], b: [3690, 3780], t: INT, ops: [{ k: 'slide', f: 2650, to: 3550, lab: '和室②推拉门' }] },
+  { a: [2190, 3780], b: [7380, 3780], t: INT, ops: [
+    { k: 'slide', f: 2290, to: 3590, lab: '餐厨推拉门' },
+    { k: 'slide', f: 4790, to: 6290, lab: '和室①/②隔扇' }] },
+  { a: [6390, 0], b: [6390, 3780], t: INT, ops: [{ k: 'slide', f: 80, to: 3700, zs: -1, lab: '壁橱门' }] },
+  { a: [4590, 3780], b: [4590, 7560], t: INT, ops: [{ k: 'slide', f: 3880, to: 7460, lab: '和室①/餐厨隔扇' }] },
+  { a: [2190, 3780], b: [2190, 7560], t: INT },
+  { a: [1140, 3780], b: [1140, 4770], t: INT },
+  { a: [0, 4770], b: [2190, 4770], t: INT, ops: [
+    { k: 'slide', f: 80, to: 1060, zs: 1, lab: '壁橱门' },
+    { k: 'slide', f: 1240, to: 2120, lab: '和室③推拉门' }] },
+  { a: [0, 7560], b: [0, 8660], t: 80, rail: true },
+  { a: [4590, 7560], b: [4590, 8660], t: 80, rail: true },
+  { a: [0, 8660], b: [4590, 8660], t: 100, rail: true },
+];
+
+const FIX = [
+  { id: 'tub', name: '浴缸', x0: 1215, y0: 80, x1: 2410, y1: 760, h: 550 },
+  { id: 'toilet', name: '马桶', x0: 2930, y0: 280, x1: 3640, y1: 670, h: 780 },
+  { id: 'vanity', name: '洗脸台', x0: 3110, y0: 1250, x1: 3640, y1: 1900, h: 850 },
+  { id: 'kitchen', name: '厨房台面', x0: 2240, y0: 5600, x1: 2890, y1: 7480, h: 850 },
+];
+
+const CATALOG = [
+  { cat: '卧室', items: [
+    { k: 'bed', name: '单人床', w: 970, d: 1950, h: 450, color: '#D9C7AE' },
+    { k: 'bed', name: '双人床 1.5m', w: 1500, d: 2000, h: 450, color: '#D9C7AE' },
+    { k: 'bed', name: '双人床 1.8m', w: 1800, d: 2000, h: 450, color: '#D9C7AE' },
+    { k: 'futon', name: '和式床垫', w: 1000, d: 2100, h: 120, color: '#ECE7DD' },
+    { k: 'box', name: '床头柜', w: 450, d: 400, h: 500, color: '#B99470' },
+    { k: 'cabinet', name: '衣柜', w: 1200, d: 600, h: 1900, color: '#A98462' },
+    { k: 'cabinet', name: '抽屉柜', w: 800, d: 450, h: 900, color: '#B99470' },
+    { k: 'desk', name: '梳妆台', w: 900, d: 450, h: 740, color: '#C9AD8A' }] },
+  { cat: '客厅', items: [
+    { k: 'sofa', name: '三人沙发', w: 2000, d: 880, h: 800, color: '#9AA3A8' },
+    { k: 'sofa', name: '双人沙发', w: 1500, d: 850, h: 800, color: '#9AA3A8' },
+    { k: 'sofa', name: '单人沙发', w: 800, d: 800, h: 800, color: '#6F7F95' },
+    { k: 'table', name: '茶几', w: 1000, d: 500, h: 400, color: '#B99470' },
+    { k: 'tv', name: '电视柜+电视', w: 1500, d: 400, h: 450, color: '#8C6B4F' },
+    { k: 'rug', name: '地毯', w: 2000, d: 1400, h: 10, color: '#C9A55B' },
+    { k: 'table', name: '暖桌', w: 800, d: 800, h: 380, color: '#B99470' }] },
+  { cat: '餐厨', items: [
+    { k: 'table', name: '餐桌 4人', w: 1200, d: 750, h: 720, color: '#B99470' },
+    { k: 'table', name: '餐桌 2人', w: 750, d: 750, h: 720, color: '#B99470' },
+    { k: 'chair', name: '餐椅', w: 450, d: 500, h: 800, color: '#6F7F95' },
+    { k: 'cabinet', name: '冰箱', w: 650, d: 700, h: 1800, color: '#E4E6E7' },
+    { k: 'cabinet', name: '微波炉架', w: 600, d: 450, h: 1500, color: '#9C8B76' },
+    { k: 'cabinet', name: '碗柜', w: 900, d: 450, h: 1800, color: '#A98462' }] },
+  { cat: '书房', items: [
+    { k: 'desk', name: '书桌', w: 1200, d: 600, h: 720, color: '#B99470' },
+    { k: 'chair', name: '办公椅', w: 600, d: 600, h: 1100, color: '#3B4347' },
+    { k: 'shelf', name: '书架', w: 800, d: 300, h: 1800, color: '#A98462' }] },
+  { cat: '其他', items: [
+    { k: 'cabinet', name: '洗衣机', w: 600, d: 600, h: 1000, color: '#ECEDEE' },
+    { k: 'cabinet', name: '收纳柜', w: 800, d: 400, h: 900, color: '#C4B39C' },
+    { k: 'cabinet', name: '鞋柜', w: 800, d: 350, h: 1000, color: '#B99470' },
+    { k: 'plant', name: '绿植', w: 400, d: 400, h: 1200, color: '#7F9A78' },
+    { k: 'rack', name: '晾衣架', w: 1500, d: 600, h: 1600, color: '#B9BEC2' }] },
+];
+const COLORS = ['#D9C7AE', '#C9AD8A', '#B99470', '#8C6B4F', '#ECEDEE', '#B9BEC2', '#9AA3A8', '#6F7F95', '#3B4347', '#7F9A78', '#C9A55B', '#B5655A'];
+
+const SAMPLE = [
+  { k: 'bed', name: '双人床 1.5m', w: 1500, d: 2000, h: 450, x: 6300, y: 5200, rot: 90, color: '#D9C7AE' },
+  { k: 'box', name: '床头柜', w: 450, d: 400, h: 500, x: 7100, y: 6200, rot: 90, color: '#B99470' },
+  { k: 'cabinet', name: '衣柜', w: 1000, d: 600, h: 1900, x: 6795, y: 4135, rot: 0, color: '#A98462' },
+  { k: 'desk', name: '梳妆台', w: 900, d: 450, h: 740, x: 5400, y: 7255, rot: 180, color: '#C9AD8A' },
+  { k: 'desk', name: '书桌', w: 1200, d: 600, h: 720, x: 4900, y: 385, rot: 0, color: '#B99470' },
+  { k: 'chair', name: '办公椅', w: 600, d: 600, h: 1100, x: 4900, y: 950, rot: 180, color: '#3B4347' },
+  { k: 'shelf', name: '书架', w: 800, d: 300, h: 1800, x: 3890, y: 1200, rot: 270, color: '#A98462' },
+  { k: 'bed', name: '单人床', w: 970, d: 1950, h: 450, x: 565, y: 6505, rot: 0, color: '#D9C7AE' },
+  { k: 'cabinet', name: '收纳柜', w: 800, d: 400, h: 900, x: 1940, y: 6800, rot: 90, color: '#C4B39C' },
+  { k: 'cabinet', name: '冰箱', w: 650, d: 700, h: 1800, x: 2590, y: 5265, rot: 270, color: '#E4E6E7' },
+  { k: 'cabinet', name: '微波炉架', w: 600, d: 450, h: 1500, x: 2465, y: 4620, rot: 270, color: '#9C8B76' },
+  { k: 'table', name: '餐桌 2人', w: 750, d: 750, h: 720, x: 3800, y: 5900, rot: 0, color: '#B99470' },
+  { k: 'chair', name: '餐椅', w: 450, d: 500, h: 800, x: 3800, y: 5375, rot: 0, color: '#6F7F95' },
+  { k: 'chair', name: '餐椅', w: 450, d: 500, h: 800, x: 3800, y: 6425, rot: 180, color: '#6F7F95' },
+  { k: 'cabinet', name: '洗衣机', w: 600, d: 600, h: 1000, x: 3340, y: 2250, rot: 0, color: '#ECEDEE' },
+];
+
+/* ================= geometry ================= */
+const rad = d => d * Math.PI / 180;
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const cmStr = mm => String(Math.round(mm / 10));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const uid = () => 'f' + Math.random().toString(36).slice(2, 9);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function corners(it) {
+  const c = Math.cos(rad(it.rot)), s = Math.sin(rad(it.rot)), hw = it.w / 2, hd = it.d / 2;
+  return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([x, y]) => [it.x + x * c - y * s, it.y + x * s + y * c]);
+}
+function bbox(P) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of P) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  return { x0, y0, x1, y1 };
+}
+const rectPoly = r => R(r.x0, r.y0, r.x1, r.y1);
+function overlap(A, B) { // SAT for convex polygons, touching (<2 mm) does not count
+  for (const P of [A, B]) for (let i = 0; i < P.length; i++) {
+    const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % P.length];
+    let nx = y2 - y1, ny = x1 - x2; const len = Math.hypot(nx, ny); if (!len) continue; nx /= len; ny /= len;
+    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+    for (const [x, y] of A) { const p = x * nx + y * ny; a0 = Math.min(a0, p); a1 = Math.max(a1, p); }
+    for (const [x, y] of B) { const p = x * nx + y * ny; b0 = Math.min(b0, p); b1 = Math.max(b1, p); }
+    if (a1 - b0 < 2 || b1 - a0 < 2) return false;
+  }
+  return true;
+}
+function inPoly([x, y], P) {
+  let ins = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    const [xi, yi] = P[i], [xj, yj] = P[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ins = !ins;
+  }
+  return ins;
+}
+const polyArea = P => Math.abs(P.reduce((s, [x, y], i) => { const [x2, y2] = P[(i + 1) % P.length]; return s + x * y2 - x2 * y; }, 0)) / 2;
+const roomAt = (x, y) => ROOMS.find(r => inPoly([x, y], r.poly)) || null;
+
+/* walls → pieces */
+const PIECES = [];
+for (const w of WALLS) {
+  const horiz = w.a[1] === w.b[1];
+  const s0 = horiz ? Math.min(w.a[0], w.b[0]) : Math.min(w.a[1], w.b[1]);
+  const s1 = horiz ? Math.max(w.a[0], w.b[0]) : Math.max(w.a[1], w.b[1]);
+  const c = horiz ? w.a[1] : w.a[0];
+  const ops = (w.ops || []).slice().sort((p, q) => p.f - q.f);
+  let cur = s0 - w.t / 2;
+  const push = p => {
+    p.horiz = horiz; p.c = c; p.t = w.t; p.rail = !!w.rail;
+    p.rect = horiz ? { x0: p.f, x1: p.to, y0: c - w.t / 2, y1: c + w.t / 2 } : { x0: c - w.t / 2, x1: c + w.t / 2, y0: p.f, y1: p.to };
+    PIECES.push(p);
+  };
+  for (const op of ops) { if (op.f > cur) push({ k: 'solid', f: cur, to: op.f }); push(Object.assign({}, op)); cur = op.to; }
+  if (s1 + w.t / 2 > cur) push({ k: 'solid', f: cur, to: s1 + w.t / 2 });
+}
+const OBST = PIECES.filter(p => p.k === 'solid' || p.k === 'win').map(p => p.rect);
+const FIXR = FIX.map(f => ({ x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1 }));
+const P2 = (p, a, b) => p.horiz ? [a, b] : [b, a]; // along/across → x,y
+
+/* door swing + sliding-door zones */
+function sector(H, E, N, L) {
+  const a0 = Math.atan2(E[1] - H[1], E[0] - H[0]);
+  let a1 = Math.atan2(N[1], N[0]);
+  let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+  const pts = [H];
+  for (let i = 0; i <= 8; i++) { const a = a0 + d * i / 8; pts.push([H[0] + L * Math.cos(a), H[1] + L * Math.sin(a)]); }
+  return pts;
+}
+const ZONES = [];
+for (const p of PIECES) {
+  if (p.k === 'door' || p.k === 'door2') {
+    const N = P2(p, 0, p.side);
+    const leaves = p.k === 'door' ? [[p.hinge === 'to' ? p.to : p.f, p.hinge === 'to' ? p.f : p.to]] : [[p.f, (p.f + p.to) / 2], [p.to, (p.f + p.to) / 2]];
+    p.leaves = leaves.map(([h, e]) => {
+      const H = P2(p, h, p.c), E = P2(p, e, p.c), L = Math.abs(e - h);
+      const O = [H[0] + N[0] * L, H[1] + N[1] * L];
+      const poly = sector(H, E, N, L);
+      ZONES.push({ poly, msg: '挡住' + p.lab + '的开门范围' });
+      return { H, E, O, L, poly };
+    });
+  } else if (p.k === 'slide' || p.k === 'fold') {
+    const dep = p.k === 'fold' ? 350 : 250, h = p.t / 2;
+    const sides = p.k === 'fold' ? [p.side] : (p.zs ? [p.zs] : [-1, 1]);
+    for (const s of sides) {
+      const a = s > 0 ? p.c + h : p.c - h - dep, b = s > 0 ? p.c + h + dep : p.c - h;
+      const r = p.horiz ? { x0: p.f, x1: p.to, y0: a, y1: b } : { x0: a, x1: b, y0: p.f, y1: p.to };
+      ZONES.push({ poly: rectPoly(r), msg: '挡住' + p.lab, rect: r });
+    }
+  }
+}
+
+/* ================= state ================= */
+const LS_DRAFT = 'takasu203.draft.v1', LS_SCHEMES = 'takasu203.schemes.v1', LS_OPTS = 'takasu203.opts.v1';
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } };
+
+const sampleItems = () => SAMPLE.map(s => Object.assign({ id: uid() }, s));
+const S = {
+  items: [], sel: null,
+  view: { x: 0, y: 0, s: 0.08 },
+  opts: Object.assign({ snap: true, dims: true, zones: true, low: false }, lsGet(LS_OPTS) || {}),
+  mode: '2d', cur: { id: null, name: '示例方案' }, dirty: false,
+  status: new Map(),
+};
+const draft = lsGet(LS_DRAFT);
+if (draft && Array.isArray(draft.items)) { S.items = draft.items; S.cur = draft.cur || S.cur; S.dirty = !!draft.dirty; }
+else S.items = sampleItems();
+
+let hist = [JSON.stringify(S.items)], hIdx = 0;
+function commit() {
+  const j = JSON.stringify(S.items);
+  if (j === hist[hIdx]) return;
+  hist = hist.slice(0, hIdx + 1); hist.push(j); if (hist.length > 120) hist.shift(); hIdx = hist.length - 1;
+  S.dirty = true; saveDraft(); refreshAll();
+}
+function restore(j) { S.items = JSON.parse(j); if (!S.items.find(i => i.id === S.sel)) S.sel = null; S.dirty = true; saveDraft(); refreshAll(); }
+function undo() { if (hIdx > 0) restore(hist[--hIdx]); }
+function redo() { if (hIdx < hist.length - 1) restore(hist[++hIdx]); }
+let draftT = 0;
+function saveDraft() { clearTimeout(draftT); draftT = setTimeout(() => lsSet(LS_DRAFT, { items: S.items, cur: S.cur, dirty: S.dirty }), 300); }
+const byId = id => S.items.find(i => i.id === id);
+
+/* ================= SVG plan (static layers) ================= */
+const svg = document.getElementById('plan');
+const NS = 'http://www.w3.org/2000/svg';
+const SVG_CSS = `
+.fl{stroke:none}
+.fl-tatami{fill:var(--tatami)} .fl-wood{fill:url(#p-wood)} .fl-wet{fill:url(#p-wet)} .fl-tile{fill:url(#p-tile)}
+.fl-closet{fill:var(--closet)} .fl-balcony{fill:url(#p-bal)} .fl-shared{fill:url(#p-hatch)}
+.pt-wood-bg{fill:var(--wood)} .pt-wood{stroke:var(--wood-line);stroke-width:8}
+.pt-wet-bg{fill:var(--wet)} .pt-wet{stroke:var(--wet-line);stroke-width:6;fill:none}
+.pt-tile-bg{fill:var(--tile)} .pt-tile{stroke:var(--tile-line);stroke-width:8;fill:none}
+.pt-bal-bg{fill:var(--balcony)} .pt-bal{stroke:var(--shared-line);stroke-width:8}
+.pt-hatch-bg{fill:var(--shared)} .pt-hatch{stroke:var(--shared-line);stroke-width:10}
+.mat{fill:none;stroke:var(--tatami-line);stroke-width:1px;vector-effect:non-scaling-stroke}
+.mat-edge{fill:none;stroke:var(--tatami-line);stroke-width:2px;vector-effect:non-scaling-stroke}
+.wall{fill:var(--wall)} .rail{fill:var(--ink-2)}
+.win{fill:var(--paper);stroke:var(--wall);stroke-width:1px;vector-effect:non-scaling-stroke}
+.win-l{stroke:var(--wall);stroke-width:1px;vector-effect:non-scaling-stroke}
+.leaf{stroke:var(--ink);stroke-width:1.4px;vector-effect:non-scaling-stroke;fill:none}
+.arc{stroke:var(--ink-2);stroke-width:1px;stroke-dasharray:4 3;vector-effect:non-scaling-stroke;fill:none}
+.slide{fill:var(--paper);stroke:var(--ink);stroke-width:1px;vector-effect:non-scaling-stroke}
+.open-l{stroke:var(--ink-2);stroke-width:1px;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}
+.step{stroke:var(--ink-2);stroke-width:1.2px;fill:none;vector-effect:non-scaling-stroke}
+.fix{fill:var(--paper);stroke:var(--ink-2);stroke-width:1.2px;vector-effect:non-scaling-stroke}
+.fix-d{fill:none;stroke:var(--ink-2);stroke-width:1px;vector-effect:non-scaling-stroke}
+.stair{stroke:var(--shared-line);stroke-width:1px;vector-effect:non-scaling-stroke}
+.zone{fill:var(--warn-soft);stroke:none}
+.rl-name{fill:var(--ink);font-family:var(--f-body);font-weight:500}
+.rl-sub{fill:var(--ink-2);font-family:var(--f-mono)}
+.dim{stroke:var(--ink-2);stroke-width:1px;vector-effect:non-scaling-stroke}
+.dim-t{fill:var(--ink-2);font-family:var(--f-mono);font-size:150px}
+.cmp{fill:none;stroke:var(--ink-2);stroke-width:1px;vector-effect:non-scaling-stroke}
+.cmp-n{fill:var(--ink)} .cmp-t{fill:var(--ink);font-family:var(--f-mono);font-size:170px;font-weight:500}
+.f{cursor:move}
+.f-body{stroke:rgba(20,28,30,.55);stroke-width:1px;vector-effect:non-scaling-stroke}
+.f-det{fill:none;stroke:rgba(20,28,30,.38);stroke-width:1px;vector-effect:non-scaling-stroke}
+.f-detf{fill:rgba(255,255,255,.35);stroke:rgba(20,28,30,.38);stroke-width:1px;vector-effect:non-scaling-stroke}
+.f-shade{fill:rgba(20,28,30,.10);stroke:none}
+.f.rug .f-body{fill-opacity:.55;stroke-dasharray:6 4}
+.f.warn .f-body{stroke:var(--warn);stroke-width:2.5px}
+.f.bad .f-body{stroke:var(--bad);stroke-width:2.5px}
+.f.sel .f-body{stroke:var(--accent);stroke-width:2.5px}
+.f-t{font-family:var(--f-body);font-weight:500;pointer-events:none}
+.f-s{font-family:var(--f-mono);pointer-events:none}
+.sel-o{fill:none;stroke:var(--accent);stroke-width:1px;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}
+.h-res{fill:var(--paper);stroke:var(--accent);stroke-width:2px;vector-effect:non-scaling-stroke;cursor:nwse-resize}
+.h-rot{fill:var(--accent);stroke:var(--paper);stroke-width:2px;vector-effect:non-scaling-stroke;cursor:grab}
+.h-line{stroke:var(--accent);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+.m-line{stroke:var(--accent);stroke-width:1.2px;vector-effect:non-scaling-stroke}
+.m-bg{fill:var(--accent)} .m-t{fill:var(--accent-ink);font-family:var(--f-mono);font-weight:500}
+`;
+document.getElementById('svgcss').textContent = SVG_CSS;
+document.getElementById('defs').innerHTML = `
+<pattern id="p-wood" patternUnits="userSpaceOnUse" width="900" height="150"><rect class="pt-wood-bg" width="900" height="150"/><line class="pt-wood" x1="0" y1="0" x2="900" y2="0"/><line class="pt-wood" x1="300" y1="0" x2="300" y2="150"/></pattern>
+<pattern id="p-wet" patternUnits="userSpaceOnUse" width="200" height="200"><rect class="pt-wet-bg" width="200" height="200"/><path class="pt-wet" d="M0 0H200M0 0V200"/></pattern>
+<pattern id="p-tile" patternUnits="userSpaceOnUse" width="300" height="300"><rect class="pt-tile-bg" width="300" height="300"/><path class="pt-tile" d="M0 0H300M0 0V300"/></pattern>
+<pattern id="p-bal" patternUnits="userSpaceOnUse" width="1000" height="220"><rect class="pt-bal-bg" width="1000" height="220"/><line class="pt-bal" x1="0" y1="0" x2="1000" y2="0"/></pattern>
+<pattern id="p-hatch" patternUnits="userSpaceOnUse" width="160" height="160" patternTransform="rotate(45)"><rect class="pt-hatch-bg" width="160" height="160"/><line class="pt-hatch" x1="0" y1="0" x2="0" y2="160"/></pattern>`;
+
+const polyStr = P => P.map(p => p[0] + ',' + p[1]).join(' ');
+function buildStatic() {
+  // floors
+  let h = '';
+  for (const r of ROOMS) {
+    h += `<polygon class="fl fl-${r.type}" points="${polyStr(r.poly)}"/>`;
+    if (r.mats) {
+      const b = bbox(r.mats.map(m => [m[0], m[1]]).concat(r.mats.map(m => [m[2], m[3]])));
+      for (const m of r.mats) h += `<rect class="mat" x="${m[0]}" y="${m[1]}" width="${m[2] - m[0]}" height="${m[3] - m[1]}"/>`;
+      h += `<rect class="mat-edge" x="${b.x0}" y="${b.y0}" width="${b.x1 - b.x0}" height="${b.y1 - b.y0}"/>`;
+    }
+  }
+  // stair treads (shared)
+  for (let y = 700; y <= 2450; y += 250) h += `<line class="stair" x1="90" y1="${y}" x2="1060" y2="${y}"/>`;
+  document.getElementById('g-floors').innerHTML = h;
+
+  // fixtures
+  h = '';
+  const fx = id => FIX.find(f => f.id === id);
+  let f = fx('tub'); h += `<rect class="fix" x="${f.x0}" y="${f.y0}" width="${f.x1 - f.x0}" height="${f.y1 - f.y0}" rx="40"/><rect class="fix-d" x="${f.x0 + 70}" y="${f.y0 + 70}" width="${f.x1 - f.x0 - 140}" height="${f.y1 - f.y0 - 140}" rx="90"/>`;
+  f = fx('toilet'); h += `<rect class="fix" x="3440" y="${f.y0}" width="200" height="${f.y1 - f.y0}" rx="20"/><ellipse class="fix" cx="3200" cy="${(f.y0 + f.y1) / 2}" rx="260" ry="180"/>`;
+  f = fx('vanity'); h += `<rect class="fix" x="${f.x0}" y="${f.y0}" width="${f.x1 - f.x0}" height="${f.y1 - f.y0}" rx="16"/><ellipse class="fix-d" cx="${(f.x0 + f.x1) / 2 - 20}" cy="${(f.y0 + f.y1) / 2}" rx="160" ry="210"/>`;
+  f = fx('kitchen'); h += `<rect class="fix" x="${f.x0}" y="${f.y0}" width="${f.x1 - f.x0}" height="${f.y1 - f.y0}"/><rect class="fix-d" x="2320" y="6150" width="480" height="560" rx="40"/><circle class="fix-d" cx="2560" cy="6980" r="120"/><circle class="fix-d" cx="2560" cy="7290" r="120"/>`;
+  h += `<rect class="fix" x="90" y="3570" width="960" height="150"/><text class="rl-sub" x="570" y="3690" font-size="110" text-anchor="middle">MB</text>`;
+  document.getElementById('g-fix').innerHTML = h;
+
+  // walls & openings
+  h = '';
+  for (const p of PIECES) {
+    const r = p.rect, rw = r.x1 - r.x0, rh = r.y1 - r.y0;
+    if (p.k === 'solid') h += `<rect class="${p.rail ? 'rail' : 'wall'}" x="${r.x0}" y="${r.y0}" width="${rw}" height="${rh}"/>`;
+    else if (p.k === 'win') {
+      h += `<rect class="win" x="${r.x0}" y="${r.y0}" width="${rw}" height="${rh}"/>`;
+      const offs = p.full ? [-p.t / 6, p.t / 6] : [0];
+      for (const o of offs) { const [a, b] = [P2(p, p.f, p.c + o), P2(p, p.to, p.c + o)]; h += `<line class="win-l" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`; }
+    } else if (p.leaves) {
+      for (const l of p.leaves) {
+        const cr = (l.O[0] - l.H[0]) * (l.E[1] - l.H[1]) - (l.O[1] - l.H[1]) * (l.E[0] - l.H[0]);
+        h += `<line class="leaf" x1="${l.H[0]}" y1="${l.H[1]}" x2="${l.O[0]}" y2="${l.O[1]}"/><path class="arc" d="M${l.O[0]} ${l.O[1]} A${l.L} ${l.L} 0 0 ${cr > 0 ? 1 : 0} ${l.E[0]} ${l.E[1]}"/>`;
+      }
+    } else if (p.k === 'slide') {
+      const mid = (p.f + p.to) / 2, th = Math.max(20, p.t / 4);
+      for (const [a, b, o] of [[p.f, mid + 40, -p.t / 4], [mid - 40, p.to, p.t / 4]]) {
+        const [x, y] = P2(p, a, p.c + o - th / 2); const [x2, y2] = P2(p, b, p.c + o + th / 2);
+        h += `<rect class="slide" x="${Math.min(x, x2)}" y="${Math.min(y, y2)}" width="${Math.abs(x2 - x)}" height="${Math.abs(y2 - y)}"/>`;
+      }
+    } else if (p.k === 'fold') {
+      const L = p.to - p.f, q = [p.f, p.f + L / 4, p.f + L / 2, p.f + 3 * L / 4, p.to], off = [0, p.side * L * .28, 0, p.side * L * .28, 0];
+      h += `<polyline class="leaf" points="${q.map((v, i) => P2(p, v, p.c + off[i]).join(',')).join(' ')}"/>`;
+    } else if (p.k === 'open') {
+      const [a, b] = [P2(p, p.f, p.c), P2(p, p.to, p.c)]; h += `<line class="open-l" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
+    }
+  }
+  h += `<polyline class="step" points="2190,2450 2190,3300 2040,3450 1140,3450"/>`;
+  document.getElementById('g-walls').innerHTML = h;
+
+  // door zones
+  document.getElementById('g-zones').innerHTML = ZONES.map(z => `<polygon class="zone" points="${polyStr(z.poly)}"/>`).join('');
+
+  // room labels
+  h = '';
+  for (const r of ROOMS) {
+    const [x, y] = r.lab, fs = r.small ? 120 : 175;
+    h += `<text class="rl-name" x="${x}" y="${y}" font-size="${fs}" text-anchor="middle">${esc(r.name)}</text>`;
+    if (!r.small) h += `<text class="rl-sub" x="${x}" y="${y + 190}" font-size="115" text-anchor="middle">${r.note ? r.note + ' · ' : ''}${(polyArea(r.poly) / 1e6).toFixed(1)}㎡</text>`;
+  }
+  document.getElementById('g-labels').innerHTML = h;
+
+  // dimension chains, like the original drawing
+  h = '';
+  const chain = (ticks, horiz, pos, textSide) => {
+    const a = ticks[0], b = ticks[ticks.length - 1];
+    const L = (u, v) => horiz ? `x1="${u}" y1="${pos}" x2="${v}" y2="${pos}"` : `x1="${pos}" y1="${u}" x2="${pos}" y2="${v}"`;
+    h += `<line class="dim" ${L(a, b)}/>`;
+    for (const t of ticks) {
+      h += horiz ? `<line class="dim" x1="${t - 55}" y1="${pos + 55}" x2="${t + 55}" y2="${pos - 55}"/><line class="dim" x1="${t}" y1="${pos - 110}" x2="${t}" y2="${pos + 110}"/>`
+        : `<line class="dim" x1="${pos - 55}" y1="${t + 55}" x2="${pos + 55}" y2="${t - 55}"/><line class="dim" x1="${pos - 110}" y1="${t}" x2="${pos + 110}" y2="${t}"/>`;
+    }
+    for (let i = 0; i < ticks.length - 1; i++) {
+      const m = (ticks[i] + ticks[i + 1]) / 2, v = fmt(ticks[i + 1] - ticks[i]);
+      h += horiz ? `<text class="dim-t" x="${m}" y="${pos - 60}" text-anchor="middle">${v}</text>`
+        : `<text class="dim-t" x="${pos + textSide * 60}" y="${m}" text-anchor="middle" transform="rotate(-90 ${pos + textSide * 60} ${m})">${v}</text>`;
+    }
+  };
+  chain([0, 1140, 2490, 3690, 6390, 7380], true, -450);
+  chain([1140, 7380], true, -950);
+  chain([0, 2190, 4590, 7380], true, 9250);
+  chain([0, 7380], true, 9750);
+  chain([0, 3780, 7560, 8660], false, 7950, 1);
+  chain([0, 7560], false, 8450, 1);
+  chain([0, 1850, 3780, 4770, 7560], false, -550, -1);
+  // compass: north points up-right (balcony faces south-east)
+  h += `<g transform="translate(-700 -850)"><circle class="cmp" r="300"/><g transform="rotate(45)"><polygon class="cmp-n" points="0,-290 95,40 0,0 -95,40"/></g><text class="cmp-t" x="250" y="-250">N</text></g>`;
+  document.getElementById('g-dims').innerHTML = h;
+}
+const BOUNDS = { x0: -1150, y0: -1350, x1: 8800, y1: 9950 };
+
+/* ================= furniture rendering ================= */
+const lum = hex => { const n = parseInt(hex.slice(1), 16); const r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
+function symbol(it) {
+  const hw = it.w / 2, hd = it.d / 2, w = it.w, d = it.d;
+  let s = '';
+  switch (it.k) {
+    case 'bed': case 'futon': {
+      const pd = Math.min(380, d * .16), n = w >= 1250 ? 2 : 1, gap = 80, pw = (w - gap * (n + 1)) / n;
+      for (let i = 0; i < n; i++) s += `<rect class="f-detf" x="${-hw + gap + i * (pw + gap)}" y="${-hd + 70}" width="${pw}" height="${pd}" rx="50"/>`;
+      const fy = -hd + d * .34;
+      s += `<path class="f-shade" d="M${-hw} ${fy}H${hw}V${hd}H${-hw}Z"/><line class="f-det" x1="${-hw}" y1="${fy}" x2="${hw}" y2="${fy}"/>`;
+      if (it.k === 'bed') s += `<line class="f-det" x1="${-hw}" y1="${-hd + 40}" x2="${hw}" y2="${-hd + 40}"/>`;
+      break; }
+    case 'sofa': {
+      const bk = Math.min(220, d * .25), ar = Math.min(180, w * .14);
+      s += `<rect class="f-detf" x="${-hw}" y="${-hd}" width="${w}" height="${bk}"/>`;
+      s += `<rect class="f-detf" x="${-hw}" y="${-hd}" width="${ar}" height="${d}"/><rect class="f-detf" x="${hw - ar}" y="${-hd}" width="${ar}" height="${d}"/>`;
+      const n = Math.max(1, Math.round((w - 2 * ar) / 650));
+      for (let i = 1; i < n; i++) { const x = -hw + ar + (w - 2 * ar) * i / n; s += `<line class="f-det" x1="${x}" y1="${-hd + bk}" x2="${x}" y2="${hd}"/>`; }
+      break; }
+    case 'chair':
+      s += `<rect class="f-detf" x="${-hw + 20}" y="${-hd}" width="${w - 40}" height="${Math.min(110, d * .2)}" rx="30"/>`; break;
+    case 'table': s += `<rect class="f-det" x="${-hw + 40}" y="${-hd + 40}" width="${Math.max(0, w - 80)}" height="${Math.max(0, d - 80)}" rx="10"/>`; break;
+    case 'desk': s += `<line class="f-det" x1="${-hw}" y1="${-hd + 60}" x2="${hw}" y2="${-hd + 60}"/>`; break;
+    case 'cabinet': s += `<line class="f-det" x1="${-hw}" y1="${-hd}" x2="${hw}" y2="${hd}"/><line class="f-det" x1="${hw}" y1="${-hd}" x2="${-hw}" y2="${hd}"/>`; break;
+    case 'shelf': for (let i = 1; i < 3; i++) s += `<line class="f-det" x1="${-hw}" y1="${-hd + d * i / 3}" x2="${hw}" y2="${-hd + d * i / 3}"/>`; break;
+    case 'tv': s += `<rect class="f-detf" x="${-hw * .8}" y="${-hd + 40}" width="${w * .8}" height="60" style="fill:#222"/>`; break;
+    case 'rack': s += `<line class="f-det" x1="${-hw}" y1="${-hd / 2}" x2="${hw}" y2="${-hd / 2}"/><line class="f-det" x1="${-hw}" y1="${hd / 2}" x2="${hw}" y2="${hd / 2}"/>`; break;
+    case 'plant': { const r = Math.min(w, d) * .3; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; s += `<line class="f-det" x1="0" y1="0" x2="${Math.cos(a) * r * 1.5}" y2="${Math.sin(a) * r * 1.5}"/>`; } break; }
+  }
+  return s;
+}
+function furnSVG(it) {
+  const st = S.status.get(it.id) || {};
+  const cls = ['f', it.k === 'rug' ? 'rug' : '', st.lvl || '', S.sel === it.id ? 'sel' : ''].join(' ');
+  const hw = it.w / 2, hd = it.d / 2;
+  const body = it.k === 'plant' ? `<ellipse class="f-body" rx="${hw}" ry="${hd}" style="fill:${it.color}"/>`
+    : `<rect class="f-body" x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" rx="${Math.min(30, it.w / 8, it.d / 8)}" style="fill:${it.color}"/>`;
+  // upright label, sized to the item's on-screen footprint
+  const c = Math.abs(Math.cos(rad(it.rot))), s = Math.abs(Math.sin(rad(it.rot)));
+  const aw = it.w * c + it.d * s, ah = it.w * s + it.d * c;
+  let fs = clamp(Math.min(aw, ah) * .2, 60, 150);
+  fs = Math.min(fs, aw * .9 / Math.max(2, it.name.length));
+  const tc = lum(it.color) > .55 ? '#1D2526' : '#FFFFFF';
+  const dims = `${cmStr(it.w)}×${cmStr(it.d)}`;
+  const showDims = ah > fs * 3.3 && aw > dims.length * fs * .5;
+  const ty = showDims ? -fs * .15 : fs * .35;
+  const label = fs >= 38 ? `<g transform="rotate(${-it.rot})"><text class="f-t" y="${ty}" font-size="${fs}" text-anchor="middle" fill="${tc}">${esc(it.name)}</text>${showDims ? `<text class="f-s" y="${ty + fs * 1.15}" font-size="${fs * .78}" text-anchor="middle" fill="${tc}" fill-opacity=".8">${dims}</text>` : ''}</g>` : '';
+  return `<g class="${cls}" data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.rot})">${body}${symbol(it)}${label}</g>`;
+}
+
+/* clearances: free distance from the selected item's bounding box to the nearest wall / fixture / furniture */
+function clearances(it) {
+  const bb = bbox(corners(it));
+  const obs = OBST.concat(FIXR, S.items.filter(o => o !== it && o.k !== 'rug').map(o => bbox(corners(o))));
+  const out = [];
+  const best = { l: null, r: null, u: null, d: null };
+  for (const r of obs) {
+    const yo0 = Math.max(bb.y0, r.y0), yo1 = Math.min(bb.y1, r.y1);
+    if (yo1 - yo0 > 1) {
+      if (r.x1 <= bb.x0 + 1) { const g = bb.x0 - r.x1; if (!best.l || g < best.l.g) best.l = { g, m: (yo0 + yo1) / 2 }; }
+      if (r.x0 >= bb.x1 - 1) { const g = r.x0 - bb.x1; if (!best.r || g < best.r.g) best.r = { g, m: (yo0 + yo1) / 2 }; }
+    }
+    const xo0 = Math.max(bb.x0, r.x0), xo1 = Math.min(bb.x1, r.x1);
+    if (xo1 - xo0 > 1) {
+      if (r.y1 <= bb.y0 + 1) { const g = bb.y0 - r.y1; if (!best.u || g < best.u.g) best.u = { g, m: (xo0 + xo1) / 2 }; }
+      if (r.y0 >= bb.y1 - 1) { const g = r.y0 - bb.y1; if (!best.d || g < best.d.g) best.d = { g, m: (xo0 + xo1) / 2 }; }
+    }
+  }
+  if (best.l) out.push({ g: best.l.g, a: [bb.x0, best.l.m], b: [bb.x0 - best.l.g, best.l.m] });
+  if (best.r) out.push({ g: best.r.g, a: [bb.x1, best.r.m], b: [bb.x1 + best.r.g, best.r.m] });
+  if (best.u) out.push({ g: best.u.g, a: [best.u.m, bb.y0], b: [best.u.m, bb.y0 - best.u.g] });
+  if (best.d) out.push({ g: best.d.g, a: [best.d.m, bb.y1], b: [best.d.m, bb.y1 + best.d.g] });
+  return out.filter(o => o.g > 5 && o.g < 5000);
+}
+
+function overlaySVG() {
+  const it = byId(S.sel); if (!it || S.mode !== '2d') return '';
+  const k = 1 / S.view.s, hw = it.w / 2, hd = it.d / 2;
+  let h = '';
+  if (S.opts.dims) {
+    for (const m of clearances(it)) {
+      const [ax, ay] = m.a, [bx, by] = m.b, mx = (ax + bx) / 2, my = (ay + by) / 2, t = 4 * k;
+      const vert = ax === bx;
+      h += `<line class="m-line" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}"/>`;
+      h += vert ? `<line class="m-line" x1="${bx - t}" y1="${by}" x2="${bx + t}" y2="${by}"/>` : `<line class="m-line" x1="${bx}" y1="${by - t}" x2="${bx}" y2="${by + t}"/>`;
+      const txt = cmStr(m.g) + ' cm', fs = 11 * k, tw = txt.length * fs * .62 + 8 * k, th = fs * 1.6;
+      h += `<rect class="m-bg" x="${mx - tw / 2}" y="${my - th / 2}" width="${tw}" height="${th}" rx="${3 * k}"/><text class="m-t" x="${mx}" y="${my + fs * .36}" font-size="${fs}" text-anchor="middle">${txt}</text>`;
+    }
+  }
+  h += `<g transform="translate(${it.x} ${it.y}) rotate(${it.rot})">`;
+  h += `<rect class="sel-o" x="${-hw - 3 * k}" y="${-hd - 3 * k}" width="${it.w + 6 * k}" height="${it.d + 6 * k}"/>`;
+  h += `<line class="h-line" x1="0" y1="${-hd}" x2="0" y2="${-hd - 26 * k}"/><circle class="h-rot" data-h="rot" cx="0" cy="${-hd - 26 * k}" r="${7 * k}"/>`;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) h += `<circle class="h-res" data-h="res" data-sx="${sx}" data-sy="${sy}" cx="${sx * hw}" cy="${sy * hd}" r="${6 * k}"/>`;
+  return h + '</g>';
+}
+
+/* status: overlaps, blocked doors, outside */
+const OK_PAIRS = { chair: ['table', 'desk'], table: ['chair'], desk: ['chair'] };
+function computeStatus() {
+  const polys = new Map(S.items.map(it => [it.id, corners(it)]));
+  const st = new Map();
+  for (const it of S.items) {
+    const P = polys.get(it.id), msgs = []; let lvl = null;
+    const add = (l, m) => { if (msgs.some(x => x.m === m)) return; msgs.push({ l, m }); if (l === 'bad') lvl = 'bad'; else if (!lvl) lvl = 'warn'; };
+    if (OBST.some(r => overlap(P, rectPoly(r)))) add('bad', '碰到墙或窗户');
+    FIX.forEach((f, i) => { if (overlap(P, rectPoly(FIXR[i]))) add('bad', '压到' + f.name); });
+    if (it.k !== 'rug') {
+      for (const o of S.items) {
+        if (o === it || o.k === 'rug' || (OK_PAIRS[it.k] || []).includes(o.k)) continue;
+        if (overlap(P, polys.get(o.id))) add('bad', '和「' + o.name + '」重叠');
+      }
+      for (const z of ZONES) if (overlap(P, z.poly)) add('warn', z.msg);
+    }
+    const room = roomAt(it.x, it.y);
+    if (!room || room.shared) add('warn', '不在屋里');
+    st.set(it.id, { lvl, msgs, room });
+  }
+  S.status = st;
+}
+
+/* ================= view ================= */
+const stage = document.getElementById('stage');
+function applyView() {
+  const W = svg.clientWidth || 1, H = svg.clientHeight || 1, v = S.view;
+  svg.setAttribute('viewBox', `${v.x} ${v.y} ${W / v.s} ${H / v.s}`);
+  document.getElementById('scalebar').style.width = (1000 * v.s) + 'px';
+}
+function fitView() {
+  const W = svg.clientWidth || 800, H = svg.clientHeight || 600;
+  const bw = BOUNDS.x1 - BOUNDS.x0, bh = BOUNDS.y1 - BOUNDS.y0;
+  const s = Math.min(W / bw, H / bh) * .97;
+  S.view = { s, x: (BOUNDS.x0 + BOUNDS.x1) / 2 - W / s / 2, y: (BOUNDS.y0 + BOUNDS.y1) / 2 - H / s / 2 };
+  applyView(); renderOverlay();
+}
+function zoomAt(f, cx, cy) {
+  const v = S.view, ns = clamp(v.s * f, 0.015, 0.8); if (ns === v.s) return;
+  const wx = v.x + cx / v.s, wy = v.y + cy / v.s;
+  S.view = { s: ns, x: wx - cx / ns, y: wy - cy / ns };
+  applyView(); renderOverlay();
+}
+function centerOn(x, y) {
+  const W = svg.clientWidth, H = svg.clientHeight;
+  S.view.x = x - W / S.view.s / 2; S.view.y = y - H / S.view.s / 2; applyView();
+}
+function toWorld(e) {
+  const r = svg.getBoundingClientRect();
+  return [S.view.x + (e.clientX - r.left) / S.view.s, S.view.y + (e.clientY - r.top) / S.view.s];
+}
+
+/* ================= render ================= */
+const gFurn = document.getElementById('g-furn'), gOver = document.getElementById('overlay');
+function renderFurn() {
+  const order = S.items.slice().sort((a, b) => (a.k === 'rug' ? 0 : 1) - (b.k === 'rug' ? 0 : 1));
+  gFurn.innerHTML = order.map(furnSVG).join('');
+}
+function renderOverlay() { gOver.innerHTML = overlaySVG(); }
+function refreshAll() {
+  computeStatus(); renderFurn(); renderOverlay(); renderSel(); renderItems(); renderStatus(); renderHeader();
+  document.getElementById('undo').disabled = hIdx <= 0; document.getElementById('redo').disabled = hIdx >= hist.length - 1;
+  if (S.mode === '3d') three.syncFurniture();
+}
+let rafPending = false;
+function refreshLive() { // cheap refresh while dragging
+  if (rafPending) return; rafPending = true;
+  requestAnimationFrame(() => { rafPending = false; computeStatus(); renderFurn(); renderOverlay(); renderSel(); renderStatus(); });
+}
+
+function renderStatus() {
+  let bad = 0, warn = 0;
+  for (const s of S.status.values()) { if (s.lvl === 'bad') bad++; else if (s.lvl === 'warn') warn++; }
+  const chip = document.getElementById('status');
+  chip.className = 'chip' + (bad ? ' bad' : warn ? ' warn' : '');
+  document.getElementById('status-text').textContent = bad || warn ? [bad ? bad + ' 件冲突' : '', warn ? warn + ' 件需注意' : ''].filter(Boolean).join(' · ') : (S.items.length ? '没有冲突' : '还没有家具');
+}
+function renderHeader() {
+  document.getElementById('scheme-name').textContent = S.cur.name || '未命名方案';
+  document.getElementById('dirty-dot').className = 'dot' + (S.dirty ? ' dirty' : '');
+  document.getElementById('scheme-state').textContent = S.dirty ? '· 有未保存的修改' : '· 已保存';
+  const sn = document.getElementById('save-name'); if (document.activeElement !== sn) sn.value = S.cur.name || '';
+  document.getElementById('count').textContent = S.items.length ? S.items.length : '';
+}
+
+/* selection panel */
+const selEl = document.getElementById('sel');
+const fields = { name: 'sel-name', w: 'sel-w', d: 'sel-d', h: 'sel-h', rot: 'sel-rot' };
+function renderSel() {
+  const it = byId(S.sel);
+  selEl.hidden = !it; if (!it) return;
+  const set = (id, v) => { const el = document.getElementById(id); if (document.activeElement !== el) el.value = v; };
+  set('sel-name', it.name); set('sel-w', cmStr(it.w)); set('sel-d', cmStr(it.d)); set('sel-h', cmStr(it.h)); set('sel-rot', Math.round(it.rot));
+  const st = S.status.get(it.id) || { msgs: [] };
+  document.getElementById('sel-room').textContent = st.room ? st.room.name : '';
+  document.getElementById('sel-warn').innerHTML = st.msgs.length ? st.msgs.map(m => `<li class="${m.l}">${esc(m.m)}</li>`).join('') : '<li class="ok">位置没有问题</li>';
+  document.querySelectorAll('#sel-colors button').forEach(b => b.setAttribute('aria-pressed', b.dataset.c.toLowerCase() === it.color.toLowerCase()));
+}
+document.getElementById('sel-colors').innerHTML = COLORS.map(c => `<button data-c="${c}" style="background:${c}" aria-label="颜色 ${c}" aria-pressed="false"></button>`).join('');
+document.getElementById('sel-colors').addEventListener('click', e => {
+  const b = e.target.closest('button'); const it = byId(S.sel); if (!b || !it) return; it.color = b.dataset.c; commit();
+});
+selEl.addEventListener('change', e => {
+  const it = byId(S.sel); if (!it) return;
+  const id = e.target.id, v = e.target.value;
+  if (id === 'sel-name') it.name = v.trim() || it.name;
+  else if (id === 'sel-rot') { const n = parseFloat(v); if (isFinite(n)) it.rot = ((n % 360) + 360) % 360; }
+  else if (['sel-w', 'sel-d', 'sel-h'].includes(id)) { const n = parseFloat(v); if (isFinite(n) && n > 0) it[id.slice(4)] = Math.max(id === 'sel-h' ? 10 : 50, Math.round(n * 10)); }
+  commit();
+});
+selEl.addEventListener('click', e => {
+  const r = e.target.closest('[data-rot]'); if (r) rotateSel(+r.dataset.rot);
+});
+function rotateSel(d) { const it = byId(S.sel); if (!it) return; it.rot = (((Math.round(it.rot / 90) * 90 + d) % 360) + 360) % 360; commit(); }
+function select(id) { S.sel = id; renderFurn(); renderOverlay(); renderSel(); renderItems(); }
+function duplicateSel() {
+  const it = byId(S.sel); if (!it) return;
+  const n = Object.assign({}, it, { id: uid(), x: it.x + 200, y: it.y + 200 }); S.items.push(n); S.sel = n.id; commit();
+}
+function deleteSel() { const i = S.items.findIndex(x => x.id === S.sel); if (i < 0) return; S.items.splice(i, 1); S.sel = null; commit(); }
+document.getElementById('sel-dup').onclick = duplicateSel;
+document.getElementById('sel-del').onclick = deleteSel;
+document.getElementById('sel-close').onclick = () => select(null);
+
+/* items list */
+let confirmClear = false;
+function renderItems() {
+  const ul = document.getElementById('items');
+  if (!S.items.length) { ul.innerHTML = '<li class="empty" style="display:block;cursor:default">还没有摆放家具。到「家具库」点一件试试。</li>'; }
+  else ul.innerHTML = S.items.map(it => {
+    const st = S.status.get(it.id) || {};
+    const pill = st.lvl === 'bad' ? '<span class="pill bad">冲突</span>' : st.lvl === 'warn' ? '<span class="pill warn">注意</span>' : '<span class="pill">正常</span>';
+    return `<li data-id="${it.id}" class="${S.sel === it.id ? 'on' : ''}"><span class="sw" style="background:${it.color}"></span><span class="nm"><b>${esc(it.name)}</b><small><span class="num">${cmStr(it.w)}×${cmStr(it.d)}×${cmStr(it.h)}</span> cm · ${st.room ? esc(st.room.name) : '屋外'}</small></span>${pill}</li>`;
+  }).join('');
+  document.getElementById('clear-wrap').innerHTML = !S.items.length ? '' : confirmClear
+    ? `<div class="confirm">确定清空全部 ${S.items.length} 件家具？<button class="btn small danger" id="clear-yes">清空</button><button class="btn small" id="clear-no">取消</button></div>`
+    : `<button class="btn small danger" id="clear">清空全部</button>`;
+}
+document.getElementById('items').addEventListener('click', e => {
+  const li = e.target.closest('li[data-id]'); if (!li) return;
+  const it = byId(li.dataset.id); if (S.mode !== '2d') setMode('2d');
+  select(it.id); centerOn(it.x, it.y); renderOverlay();
+  if (window.matchMedia('(max-width: 860px)').matches) stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+document.getElementById('clear-wrap').addEventListener('click', e => {
+  if (e.target.id === 'clear') { confirmClear = true; renderItems(); }
+  else if (e.target.id === 'clear-no') { confirmClear = false; renderItems(); }
+  else if (e.target.id === 'clear-yes') { confirmClear = false; S.items = []; S.sel = null; commit(); }
+});
+
+/* library */
+let curCat = '全部';
+function cardIcon(t) {
+  const m = Math.max(t.w, t.d), w = 36 * t.w / m, d = 36 * t.d / m;
+  return `<svg viewBox="0 0 44 44" aria-hidden="true"><rect x="${22 - w / 2}" y="${22 - d / 2}" width="${w}" height="${d}" rx="${t.k === 'plant' ? Math.min(w, d) / 2 : 2}" fill="${t.color}" stroke="rgba(0,0,0,.35)"/></svg>`;
+}
+function renderLib() {
+  const cats = ['全部'].concat(CATALOG.map(c => c.cat));
+  document.getElementById('cats').innerHTML = cats.map(c => `<button data-cat="${c}" aria-pressed="${c === curCat}">${c}</button>`).join('');
+  const list = []; CATALOG.forEach((c, ci) => c.items.forEach((t, ti) => { if (curCat === '全部' || c.cat === curCat) list.push([ci, ti, t]); }));
+  document.getElementById('lib').innerHTML = list.map(([ci, ti, t]) => `<button class="card" draggable="true" data-t="${ci}.${ti}">${cardIcon(t)}<span><b>${esc(t.name)}</b><small>${cmStr(t.w)}×${cmStr(t.d)} cm</small></span></button>`).join('');
+}
+document.getElementById('cats').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { curCat = b.dataset.cat; renderLib(); } });
+const tmplOf = key => { const [ci, ti] = key.split('.').map(Number); return CATALOG[ci].items[ti]; };
+function addItem(t, x, y) {
+  if (x == null) {
+    const W = svg.clientWidth, H = svg.clientHeight;
+    x = S.view.x + W / S.view.s / 2; y = S.view.y + H / S.view.s / 2;
+    const r = roomAt(x, y); if (!r || r.shared || r.type === 'balcony') { x = 3500; y = 5000; }
+    const n = S.items.filter(i => Math.abs(i.x - x) < 50 && Math.abs(i.y - y) < 50).length; x += n * 150; y += n * 150;
+  }
+  const it = { id: uid(), k: t.k, name: t.name, w: t.w, d: t.d, h: t.h, color: t.color, x: Math.round(x), y: Math.round(y), rot: 0 };
+  S.items.push(it); S.sel = it.id; if (S.mode !== '2d') setMode('2d'); commit();
+  if (window.matchMedia('(max-width: 860px)').matches) stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+document.getElementById('lib').addEventListener('click', e => { const b = e.target.closest('.card'); if (b) addItem(tmplOf(b.dataset.t)); });
+document.getElementById('lib').addEventListener('dragstart', e => { const b = e.target.closest('.card'); if (b) { e.dataTransfer.setData('text/plain', 'tmpl:' + b.dataset.t); e.dataTransfer.effectAllowed = 'copy'; } });
+svg.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+svg.addEventListener('drop', e => {
+  e.preventDefault(); const d = e.dataTransfer.getData('text/plain'); if (!d.startsWith('tmpl:')) return;
+  const [x, y] = toWorld(e); addItem(tmplOf(d.slice(5)), x, y);
+});
+document.getElementById('custom').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = id => parseFloat(document.getElementById(id).value);
+  const k = document.getElementById('c-k').value, name = document.getElementById('c-name').value.trim();
+  if (!name || !(v('c-w') > 0 && v('c-d') > 0 && v('c-h') > 0)) return;
+  const color = { bed: '#D9C7AE', sofa: '#9AA3A8', chair: '#6F7F95', rug: '#C9A55B', plant: '#7F9A78', cabinet: '#A98462' }[k] || '#C9AD8A';
+  addItem({ k, name, w: v('c-w') * 10, d: v('c-d') * 10, h: v('c-h') * 10, color });
+  document.getElementById('c-name').value = '';
+});
+
+/* tabs */
+const panel = document.getElementById('panel');
+panel.querySelector('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab);
+});
+function showTab(t) {
+  panel.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  panel.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== t);
+}
+document.getElementById('status').onclick = () => {
+  showTab('items');
+  const bad = S.items.find(i => (S.status.get(i.id) || {}).lvl);
+  if (bad) { select(bad.id); centerOn(bad.x, bad.y); renderOverlay(); }
+  if (window.matchMedia('(max-width: 860px)').matches) panel.scrollIntoView({ behavior: 'smooth' });
+};
+
+/* ================= pointer interaction ================= */
+const pointers = new Map();
+let drag = null;
+function snapMove(it, nx, ny) {
+  if (!S.opts.snap) return [nx, ny];
+  nx = Math.round(nx / 10) * 10; ny = Math.round(ny / 10) * 10;
+  const bb = bbox(corners(Object.assign({}, it, { x: nx, y: ny })));
+  const thr = 12 / S.view.s;
+  const rects = OBST.concat(FIXR, S.items.filter(o => o !== it && o.k !== 'rug').map(o => bbox(corners(o))));
+  let bx = null, by = null;
+  for (const r of rects) {
+    if (r.y0 < bb.y1 - 1 && r.y1 > bb.y0 + 1) for (const d of [r.x1 - bb.x0, r.x0 - bb.x1]) if (Math.abs(d) < thr && (bx === null || Math.abs(d) < Math.abs(bx))) bx = d;
+    if (r.x0 < bb.x1 - 1 && r.x1 > bb.x0 + 1) for (const d of [r.y1 - bb.y0, r.y0 - bb.y1]) if (Math.abs(d) < thr && (by === null || Math.abs(d) < Math.abs(by))) by = d;
+  }
+  return [nx + (bx || 0), ny + (by || 0)];
+}
+svg.addEventListener('pointerdown', e => {
+  if (e.button > 0 && e.pointerType === 'mouse' && e.button !== 1) return;
+  svg.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 2) {
+    if (drag && drag.type !== 'pan' && drag.changed) commit();
+    const [a, b] = [...pointers.values()];
+    drag = { type: 'pinch', d0: Math.hypot(a[0] - b[0], a[1] - b[1]), s0: S.view.s, m0: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], v0: Object.assign({}, S.view) };
+    return;
+  }
+  if (pointers.size > 2) return;
+  const p = toWorld(e);
+  const handle = e.target.closest('[data-h]');
+  const fEl = e.target.closest('[data-id]');
+  if (handle && byId(S.sel)) {
+    const it = byId(S.sel);
+    if (handle.dataset.h === 'rot') drag = { type: 'rot', id: it.id };
+    else {
+      const sx = +handle.dataset.sx, sy = +handle.dataset.sy, c = Math.cos(rad(it.rot)), s = Math.sin(rad(it.rot));
+      const fx = -sx * it.w / 2, fy = -sy * it.d / 2;
+      drag = { type: 'res', id: it.id, sx, sy, F: [it.x + fx * c - fy * s, it.y + fx * s + fy * c] };
+    }
+  } else if (fEl) {
+    const it = byId(fEl.dataset.id);
+    if (S.sel !== it.id) select(it.id);
+    drag = { type: 'move', id: it.id, off: [p[0] - it.x, p[1] - it.y], start: [e.clientX, e.clientY] };
+  } else {
+    drag = { type: 'pan', start: [e.clientX, e.clientY], v0: Object.assign({}, S.view), moved: false };
+  }
+  svg.classList.add('dragging');
+});
+svg.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId) || !drag) return;
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (drag.type === 'pinch') {
+    if (pointers.size < 2) return;
+    const [a, b] = [...pointers.values()], r = svg.getBoundingClientRect();
+    const d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const ns = clamp(drag.s0 * d / drag.d0, 0.015, 0.8), v0 = drag.v0;
+    const wx = v0.x + (drag.m0[0] - r.left) / v0.s, wy = v0.y + (drag.m0[1] - r.top) / v0.s;
+    S.view = { s: ns, x: wx - (m[0] - r.left) / ns, y: wy - (m[1] - r.top) / ns };
+    applyView(); renderOverlay(); return;
+  }
+  if (drag.type === 'pan') {
+    const dx = e.clientX - drag.start[0], dy = e.clientY - drag.start[1];
+    if (Math.hypot(dx, dy) > 3) drag.moved = true;
+    S.view.x = drag.v0.x - dx / S.view.s; S.view.y = drag.v0.y - dy / S.view.s; applyView(); return;
+  }
+  const it = byId(drag.id); if (!it) return;
+  const p = toWorld(e);
+  if (drag.type === 'move') {
+    if (!drag.changed && Math.hypot(e.clientX - drag.start[0], e.clientY - drag.start[1]) < 3) return;
+    [it.x, it.y] = snapMove(it, p[0] - drag.off[0], p[1] - drag.off[1]);
+  } else if (drag.type === 'rot') {
+    let a = Math.atan2(p[1] - it.y, p[0] - it.x) * 180 / Math.PI + 90;
+    if (S.opts.snap && !e.altKey) a = Math.round(a / 15) * 15;
+    it.rot = ((Math.round(a) % 360) + 360) % 360;
+  } else if (drag.type === 'res') {
+    const c = Math.cos(rad(it.rot)), s = Math.sin(rad(it.rot));
+    const vx = p[0] - drag.F[0], vy = p[1] - drag.F[1];
+    const lx = vx * c + vy * s, ly = -vx * s + vy * c;
+    const st = S.opts.snap ? 10 : 1;
+    const w = Math.max(100, Math.round(drag.sx * lx / st) * st), d = Math.max(100, Math.round(drag.sy * ly / st) * st);
+    const ox = drag.sx * w / 2, oy = drag.sy * d / 2;
+    it.w = w; it.d = d; it.x = drag.F[0] + ox * c - oy * s; it.y = drag.F[1] + ox * s + oy * c;
+  }
+  drag.changed = true; refreshLive();
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (!drag) return;
+  if (drag.type === 'pinch') { if (pointers.size === 0) { drag = null; svg.classList.remove('dragging'); } return; }
+  if (drag.type === 'pan' && !drag.moved && e.type === 'pointerup') select(null);
+  if (drag.changed) { const it = byId(drag.id); if (it) { it.x = Math.round(it.x); it.y = Math.round(it.y); } commit(); }
+  drag = null; svg.classList.remove('dragging');
+}
+svg.addEventListener('pointerup', endPointer);
+svg.addEventListener('pointercancel', endPointer);
+svg.addEventListener('wheel', e => {
+  e.preventDefault(); const r = svg.getBoundingClientRect();
+  zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+const zoomBtn = f => zoomAt(f, svg.clientWidth / 2, svg.clientHeight / 2);
+document.getElementById('zoom-in').onclick = () => S.mode === '3d' ? three.zoom(0.8) : zoomBtn(1.3);
+document.getElementById('zoom-out').onclick = () => S.mode === '3d' ? three.zoom(1.25) : zoomBtn(1 / 1.3);
+document.getElementById('zoom-fit').onclick = () => S.mode === '3d' ? three.reset() : fitView();
+
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+  const it = byId(S.sel); if (!it) return;
+  if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSel(); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); return; }
+  if (e.key === 'Escape') { select(null); return; }
+  if (e.key === 'r' || e.key === 'R') { rotateSel(e.shiftKey ? -90 : 90); return; }
+  const step = e.shiftKey ? 100 : 10, mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+  if (mv) { e.preventDefault(); it.x += mv[0]; it.y += mv[1]; commit(); }
+});
+
+/* options */
+function applyOpts() {
+  document.getElementById('opt-snap').checked = S.opts.snap;
+  document.getElementById('opt-dims').checked = S.opts.dims;
+  document.getElementById('opt-zones').checked = S.opts.zones;
+  document.getElementById('opt-low').checked = S.opts.low;
+  document.getElementById('g-zones').style.display = S.opts.zones ? '' : 'none';
+}
+for (const k of ['snap', 'dims', 'zones', 'low']) document.getElementById('opt-' + k).addEventListener('change', e => {
+  S.opts[k] = e.target.checked; lsSet(LS_OPTS, S.opts); applyOpts(); renderOverlay(); if (k === 'low' && S.mode === '3d') three.rebuildWalls();
+});
+document.getElementById('undo').onclick = undo;
+document.getElementById('redo').onclick = redo;
+
+/* ================= toast ================= */
+let toastT = 0;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+
+/* ================= capabilities ================= */
+const cap = name => (window.claude && typeof window.claude.use === 'function') ? window.claude.use(name).catch(() => null) : Promise.resolve(null);
+
+/* ================= schemes (shared db when available, else this browser) ================= */
+let db = null, schemes = [], confirmDel = null;
+function localSchemes() { return (lsGet(LS_SCHEMES) || []).sort((a, b) => b.updatedAt - a.updatedAt); }
+schemes = localSchemes();
+function renderSchemes() {
+  const ul = document.getElementById('schemes');
+  document.getElementById('store-note').textContent = db
+    ? '方案保存在这个页面里，换设备打开同一个链接也能看到；分享给家人后他们也能看到。'
+    : '方案保存在这个浏览器里。换设备或清理浏览器数据后会看不到。';
+  if (!schemes.length) { ul.innerHTML = '<li class="empty" style="display:block">还没有保存的方案。摆好后点上面的「保存」。</li>'; return; }
+  ul.innerHTML = schemes.map(s => {
+    const t = new Date(s.updatedAt || 0), when = `${t.getMonth() + 1}月${t.getDate()}日 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+    const on = s.id === S.cur.id;
+    const actions = confirmDel === s.id
+      ? `<span class="confirm">删除？<button class="btn small danger" data-act="del-yes" data-id="${s.id}">删除</button><button class="btn small" data-act="del-no">取消</button></span>`
+      : `<span class="row"><button class="btn small" data-act="load" data-id="${s.id}">载入</button><button class="btn small danger" data-act="del" data-id="${s.id}" aria-label="删除方案">删除</button></span>`;
+    return `<li class="${on ? 'on' : ''}"><span class="nm"><b>${esc(s.name || '未命名')}</b><small>${(s.items || []).length} 件 · ${when}${on ? ' · 当前' : ''}</small></span>${actions}</li>`;
+  }).join('');
+}
+async function saveScheme(asNew) {
+  const name = document.getElementById('save-name').value.trim() || S.cur.name || '我的方案';
+  const data = { name, items: JSON.parse(JSON.stringify(S.items)), updatedAt: Date.now() };
+  const id = (!asNew && S.cur.id && schemes.some(s => s.id === S.cur.id)) ? S.cur.id : null;
+  try {
+    if (db) {
+      const ref = id ? db.collection('layouts').doc(id) : db.collection('layouts').doc();
+      await ref.set(data); S.cur = { id: ref.id, name };
+    } else {
+      const list = localSchemes(), nid = id || ('s' + Date.now().toString(36));
+      const i = list.findIndex(s => s.id === nid); const rec = Object.assign({ id: nid }, data);
+      if (i >= 0) list[i] = rec; else list.push(rec);
+      lsSet(LS_SCHEMES, list); schemes = localSchemes(); S.cur = { id: nid, name };
+    }
+    S.dirty = false; saveDraft(); renderHeader(); renderSchemes(); toast(`已保存「${name}」`);
+  } catch (err) {
+    const code = err && err.code;
+    toast(code === 'invalid_argument' ? '你对这个页面只有查看权限，方案存不进去。可以用「导出图片」保存。'
+      : code === 'quota_exceeded' ? '保存的方案太多了，先删掉几个旧方案再试。' : '保存没有成功，请稍后再试。');
+  }
+}
+document.getElementById('save').onclick = () => saveScheme(false);
+document.getElementById('save-new').onclick = () => saveScheme(true);
+document.getElementById('schemes').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, id = b.dataset.id;
+  if (act === 'load') {
+    const s = schemes.find(x => x.id === id); if (!s) return;
+    S.items = JSON.parse(JSON.stringify(s.items || [])); S.sel = null; S.cur = { id: s.id, name: s.name };
+    hist = [JSON.stringify(S.items)]; hIdx = 0; S.dirty = false; saveDraft(); refreshAll(); renderSchemes(); toast(`已载入「${s.name}」`);
+  } else if (act === 'del') { confirmDel = id; renderSchemes(); }
+  else if (act === 'del-no') { confirmDel = null; renderSchemes(); }
+  else if (act === 'del-yes') {
+    confirmDel = null;
+    try {
+      if (db) await db.collection('layouts').doc(id).delete();
+      else { lsSet(LS_SCHEMES, localSchemes().filter(s => s.id !== id)); schemes = localSchemes(); }
+      if (S.cur.id === id) { S.cur = { id: null, name: S.cur.name }; S.dirty = true; renderHeader(); }
+      renderSchemes();
+    } catch (err) { toast('删除没有成功，可能没有编辑权限。'); }
+  }
+});
+document.getElementById('load-sample').onclick = () => {
+  S.items = sampleItems(); S.sel = null; S.cur = { id: null, name: '示例方案' }; commit(); toast('已载入示例方案，可以撤销');
+};
+cap('db').then(d => {
+  if (!d) return;
+  db = d; renderSchemes();
+  try {
+    db.collection('layouts').onSnapshot(snap => {
+      schemes = snap.docs.map(doc => Object.assign({ id: doc.id }, doc.data())).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      renderSchemes();
+    }, () => { db = null; schemes = localSchemes(); renderSchemes(); });
+  } catch (err) { db = null; schemes = localSchemes(); renderSchemes(); }
+});
+
+/* ================= export PNG ================= */
+function resolvedCss() {
+  const cs = getComputedStyle(document.documentElement);
+  return SVG_CSS.replace(/var\((--[a-z0-9-]+)\)/g, (_, n) => cs.getPropertyValue(n).trim() || '#000');
+}
+async function exportPNG() {
+  const btn = document.getElementById('export'); btn.disabled = true;
+  try {
+    const was = S.sel; S.sel = null; renderFurn(); renderOverlay();
+    const clone = svg.cloneNode(true); S.sel = was; renderFurn(); renderOverlay();
+    const pad = 300, b = { x0: BOUNDS.x0 - pad, y0: BOUNDS.y0 - pad - 700, x1: BOUNDS.x1 + pad, y1: BOUNDS.y1 + pad };
+    const bw = b.x1 - b.x0, bh = b.y1 - b.y0, outW = 2400, outH = Math.round(outW * bh / bw);
+    clone.setAttribute('viewBox', `${b.x0} ${b.y0} ${bw} ${bh}`); clone.setAttribute('width', outW); clone.setAttribute('height', outH);
+    clone.querySelector('#overlay').innerHTML = '';
+    if (!S.opts.zones) clone.querySelector('#g-zones').remove(); else clone.querySelector('#g-zones').removeAttribute('style');
+    clone.querySelector('style').textContent = resolvedCss();
+    const cs = getComputedStyle(document.documentElement), paper = cs.getPropertyValue('--paper').trim(), ink = cs.getPropertyValue('--ink').trim(), ink2 = cs.getPropertyValue('--ink-2').trim();
+    const t = new Date();
+    const head = document.createElementNS(NS, 'g');
+    head.innerHTML = `<rect x="${b.x0}" y="${b.y0}" width="${bw}" height="${bh}" fill="${paper}"/>`;
+    clone.insertBefore(head, clone.querySelector('#g-floors'));
+    const title = document.createElementNS(NS, 'g');
+    title.innerHTML = `<text x="${b.x0 + 300}" y="${b.y0 + 420}" font-size="300" font-weight="600" fill="${ink}" font-family="Noto Serif SC, serif">高洲新家 · ${esc(S.cur.name || '布局方案')}</text><text x="${b.x0 + 300}" y="${b.y0 + 720}" font-size="170" fill="${ink2}" font-family="monospace">3-3-5-203 · 3DK · ${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')} · 家具 ${S.items.length} 件</text>`;
+    clone.appendChild(title);
+    const xml = new XMLSerializer().serializeToString(clone);
+    const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+    await img.decode();
+    const cv = document.createElement('canvas'); cv.width = outW; cv.height = outH;
+    cv.getContext('2d').drawImage(img, 0, 0, outW, outH);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    const fname = `高洲新家-${(S.cur.name || '布局').replace(/[\\/:*?"<>|]/g, '')}.png`;
+    const dl = await cap('downloads');
+    if (dl) {
+      try { const r = await dl.save({ filename: fname, data: blob }); if (r && r.status === 'saved') toast('图片已保存'); return; }
+      catch (err) { if (err && (err.code === 'declined' || err.code === 'rate_limited')) return; }
+    }
+    document.getElementById('modal-img').src = URL.createObjectURL(blob);
+    document.getElementById('modal').hidden = false;
+  } catch (err) { toast('导出没有成功：' + (err && err.message ? err.message : '未知原因')); }
+  finally { btn.disabled = false; }
+}
+document.getElementById('export').onclick = exportPNG;
+document.getElementById('modal-close').onclick = () => { document.getElementById('modal').hidden = true; };
+
+/* ================= 3D ================= */
+const three = (() => {
+  let T = null, renderer, scene, camera, wallsG, furnG, el = document.getElementById('view3d'), ready = null, need = false;
+  const orb = { tx: 3.69, ty: 0, tz: 4.3, th: 0.35, ph: 0.82, r: 13.5 };
+  const FLOOR = { tatami: 0xCDD3A0, wood: 0xD9BF99, wet: 0xCFDCE1, tile: 0xC7CAC6, closet: 0xD7D0C3, balcony: 0xBCC1BB, shared: 0xB4B9B4 };
+  const mat = (c, o) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: .85, metalness: 0 }, o || {}));
+  function load() {
+    if (ready) return ready;
+    ready = new Promise((res, rej) => {
+      if (window.THREE) return res();
+      const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+      s.onload = res; s.onerror = () => { ready = null; rej(new Error('3D 组件加载失败')); }; document.head.appendChild(s);
+    }).then(init);
+    return ready;
+  }
+  function init() {
+    T = window.THREE;
+    renderer = new T.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.outputEncoding = T.sRGBEncoding;
+    el.appendChild(renderer.domElement);
+    scene = new T.Scene();
+    camera = new T.PerspectiveCamera(38, 1, 0.1, 200);
+    scene.add(new T.HemisphereLight(0xffffff, 0x8d918a, 0.8));
+    const sun = new T.DirectionalLight(0xfff4e6, 0.75); sun.position.set(9, 14, 13); sun.target.position.set(3.7, 0, 4.3);
+    sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 40 }); sun.shadow.bias = -0.0005;
+    scene.add(sun, sun.target);
+    // floors
+    for (const r of ROOMS) {
+      const sh = new T.Shape(r.poly.map(([x, y]) => new T.Vector2(x / 1000, y / 1000)));
+      const m = new T.Mesh(new T.ShapeGeometry(sh), mat(FLOOR[r.type], { side: T.DoubleSide }));
+      m.rotation.x = Math.PI / 2; m.position.y = r.type === 'tatami' ? 0.004 : 0; m.receiveShadow = true; scene.add(m);
+      if (r.mats) for (const t of r.mats) {
+        const g = new T.EdgesGeometry(new T.PlaneGeometry((t[2] - t[0]) / 1000, (t[3] - t[1]) / 1000));
+        const l = new T.LineSegments(g, new T.LineBasicMaterial({ color: 0xa7ae7c })); l.rotation.x = -Math.PI / 2;
+        l.position.set((t[0] + t[2]) / 2000, 0.008, (t[1] + t[3]) / 2000); scene.add(l);
+      }
+    }
+    // fixtures
+    for (const f of FIX) {
+      const g = box((f.x1 - f.x0) / 1000, f.h / 1000, (f.y1 - f.y0) / 1000, f.id === 'kitchen' ? 0xE9E6E0 : 0xF4F4F2);
+      g.position.set((f.x0 + f.x1) / 2000, f.h / 2000, (f.y0 + f.y1) / 2000); scene.add(g);
+    }
+    wallsG = new T.Group(); furnG = new T.Group(); scene.add(wallsG, furnG);
+    rebuildWalls(); syncFurniture(); bindOrbit();
+    new ResizeObserver(resize).observe(el); resize(); applyTheme();
+  }
+  function box(w, h, d, c, o) { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c, o)); m.castShadow = true; m.receiveShadow = true; return m; }
+  function rebuildWalls() {
+    if (!T) return;
+    while (wallsG.children.length) { const o = wallsG.children.pop(); if (o.geometry) o.geometry.dispose(); }
+    const H = S.opts.low ? 1000 : WALL_H;
+    const wm = mat(0xF2F0EB), rm = mat(0x9AA19E), gm = mat(0xA9CAD8, { transparent: true, opacity: .32, roughness: .1 });
+    const edgeM = new T.LineBasicMaterial({ color: 0x80888a });
+    const seg = (p, z0, z1, m, glass) => {
+      z1 = Math.min(z1, p.rail ? 1100 : H); if (z1 - z0 < 5) return;
+      const r = p.rect; let w = (r.x1 - r.x0) / 1000, d = (r.y1 - r.y0) / 1000;
+      if (glass) { if (p.horiz) d = 0.02; else w = 0.02; }
+      const geo = new T.BoxGeometry(w, (z1 - z0) / 1000, d);
+      const mesh = new T.Mesh(geo, m); mesh.position.set((r.x0 + r.x1) / 2000, (z0 + z1) / 2000, (r.y0 + r.y1) / 2000);
+      if (!glass) { mesh.castShadow = true; mesh.receiveShadow = true; const e = new T.LineSegments(new T.EdgesGeometry(geo), edgeM); e.position.copy(mesh.position); wallsG.add(e); }
+      wallsG.add(mesh);
+    };
+    for (const p of PIECES) {
+      if (p.k === 'solid') seg(p, 0, p.rail ? 1100 : WALL_H, p.rail ? rm : wm);
+      else if (p.k === 'win') { if (p.sill > 0) seg(p, 0, p.sill, wm); seg(p, p.head, WALL_H, wm); seg(p, p.sill, p.head, gm, true); }
+      else seg(p, p.k === 'slide' ? 1800 : 2000, WALL_H, wm);
+    }
+    need = true;
+  }
+  const tint = (c, k) => new T.Color(c).lerp(new T.Color(k > 0 ? 0xffffff : 0x000000), Math.abs(k));
+  function buildItem(it) {
+    const g = new T.Group(), W = it.w / 1000, D = it.d / 1000, H = Math.max(0.01, it.h / 1000), c = new T.Color(it.color);
+    const add = (w, h, d, x, y, z, col, o) => { const m = box(w, h, d, col, o); m.position.set(x, y, z); g.add(m); return m; };
+    switch (it.k) {
+      case 'bed': {
+        const base = Math.min(0.3, H * .6);
+        add(W, base, D, 0, base / 2, 0, tint(c, -.25));
+        add(W - .04, H - base, D - .06, 0, base + (H - base) / 2, .02, 0xF3F1EC);
+        add(W, .85, .06, 0, .425, -D / 2 + .03, tint(c, -.3));
+        add(W - .08, .07, D * .62, 0, H + .02, D * .17, c);
+        const n = W >= 1.25 ? 2 : 1, pw = (W - .1 * (n + 1)) / n;
+        for (let i = 0; i < n; i++) add(pw, .1, .32, -W / 2 + .1 + pw / 2 + i * (pw + .1), H + .05, -D / 2 + .3, 0xFFFFFF);
+        break; }
+      case 'futon': add(W, H, D, 0, H / 2, 0, c); add(W * .6, .08, .3, 0, H + .04, -D / 2 + .25, 0xFFFFFF); break;
+      case 'sofa': {
+        const ar = Math.min(.18, W * .14), seat = Math.min(.42, H * .55);
+        add(W, seat, D, 0, seat / 2, 0, c);
+        add(W, H, Math.min(.22, D * .25), 0, H / 2, -D / 2 + Math.min(.22, D * .25) / 2, tint(c, -.08));
+        add(ar, H * .75, D, -W / 2 + ar / 2, H * .375, 0, tint(c, -.08)); add(ar, H * .75, D, W / 2 - ar / 2, H * .375, 0, tint(c, -.08));
+        break; }
+      case 'table': case 'desk': {
+        const t = .035, lg = .05;
+        add(W, t, D, 0, H - t / 2, 0, c);
+        for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(lg, H - t, lg, sx * (W / 2 - lg), (H - t) / 2, sz * (D / 2 - lg), tint(c, -.2));
+        break; }
+      case 'chair': {
+        const sh = Math.min(.45, H * .55), lg = .035;
+        add(W * .9, .05, D * .85, 0, sh, .02, c);
+        add(W * .9, H - sh, .05, 0, sh + (H - sh) / 2, -D / 2 + .05, c);
+        for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(lg, sh, lg, sx * (W * .42), sh / 2, sz * (D * .38), 0x555555);
+        break; }
+      case 'tv': add(W, H, D, 0, H / 2, 0, c); add(W * .8, W * .8 * .56, .05, 0, H + W * .8 * .28 + .02, -D / 2 + .1, 0x1E1E1E); break;
+      case 'rug': add(W, .012, D, 0, .006, 0, c); break;
+      case 'plant': {
+        const r = Math.min(W, D) / 2;
+        const pot = new T.Mesh(new T.CylinderGeometry(r * .55, r * .45, .35, 20), mat(0xB07A55)); pot.position.y = .175; pot.castShadow = true; g.add(pot);
+        const leaf = new T.Mesh(new T.SphereGeometry(r, 18, 14), mat(c)); leaf.scale.y = Math.max(1, (H - .35) / (2 * r)); leaf.position.y = .35 + (H - .35) / 2; leaf.castShadow = true; g.add(leaf);
+        break; }
+      case 'shelf': {
+        add(W, H, .02, 0, H / 2, -D / 2 + .01, tint(c, -.1));
+        add(.025, H, D, -W / 2 + .0125, H / 2, 0, c); add(.025, H, D, W / 2 - .0125, H / 2, 0, c);
+        const n = Math.max(2, Math.round(H / .35));
+        for (let i = 0; i <= n; i++) add(W, .022, D, 0, Math.min(H - .011, .011 + i * (H - .022) / n), 0, c);
+        break; }
+      case 'rack': add(.03, H, .03, -W / 2, H / 2, 0, c); add(.03, H, .03, W / 2, H / 2, 0, c); add(W, .03, .03, 0, H, 0, c); add(W, .03, D, 0, .03, 0, c); break;
+      default: add(W, H, D, 0, H / 2, 0, c);
+    }
+    g.position.set(it.x / 1000, 0, it.y / 1000); g.rotation.y = -rad(it.rot);
+    return g;
+  }
+  function syncFurniture() {
+    if (!T) return;
+    while (furnG.children.length) { const o = furnG.children.pop(); o.traverse(n => { if (n.geometry) n.geometry.dispose(); if (n.material) n.material.dispose(); }); }
+    for (const it of S.items) furnG.add(buildItem(it));
+    need = true; tick();
+  }
+  function place() {
+    const s = Math.sin(orb.ph);
+    camera.position.set(orb.tx + orb.r * s * Math.sin(orb.th), orb.ty + orb.r * Math.cos(orb.ph), orb.tz + orb.r * s * Math.cos(orb.th));
+    camera.lookAt(orb.tx, orb.ty, orb.tz);
+  }
+  function tick() {
+    if (!need || !T) return; need = false;
+    requestAnimationFrame(() => { place(); renderer.render(scene, camera); });
+  }
+  function resize() {
+    if (!T) return; const w = el.clientWidth || 1, h = el.clientHeight || 1;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); need = true; tick();
+  }
+  function applyTheme() {
+    if (!T) return; scene.background = new T.Color(getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#fafaf6'); need = true; tick();
+  }
+  function bindOrbit() {
+    const cv = renderer.domElement, pts = new Map(); let mode = null, last = null, d0 = 0, r0 = 0;
+    cv.addEventListener('contextmenu', e => e.preventDefault());
+    cv.addEventListener('pointerdown', e => {
+      cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; d0 = Math.hypot(a[0] - b[0], a[1] - b[1]); r0 = orb.r; mode = 'pinch'; }
+      else { mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot'; last = [e.clientX, e.clientY]; }
+    });
+    cv.addEventListener('pointermove', e => {
+      if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+      if (mode === 'pinch' && pts.size === 2) { const [a, b] = [...pts.values()]; orb.r = clamp(r0 * d0 / Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])), 3, 35); }
+      else if (mode === 'rot') { orb.th -= (e.clientX - last[0]) * .008; orb.ph = clamp(orb.ph - (e.clientY - last[1]) * .006, .08, 1.5); last = [e.clientX, e.clientY]; }
+      else if (mode === 'pan') {
+        const dx = (e.clientX - last[0]) * orb.r * .0012, dy = (e.clientY - last[1]) * orb.r * .0012;
+        orb.tx -= dx * Math.cos(orb.th) + dy * Math.sin(orb.th); orb.tz -= -dx * Math.sin(orb.th) + dy * Math.cos(orb.th); last = [e.clientX, e.clientY];
+      } else return;
+      need = true; tick();
+    });
+    const up = e => { pts.delete(e.pointerId); if (pts.size === 1) { mode = 'rot'; last = [...pts.values()][0]; } else if (!pts.size) mode = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', e => { e.preventDefault(); orb.r = clamp(orb.r * Math.exp(e.deltaY * .0012), 3, 35); need = true; tick(); }, { passive: false });
+  }
+  return {
+    show: () => load().then(() => { resize(); need = true; tick(); }),
+    syncFurniture, rebuildWalls: () => { rebuildWalls(); tick(); }, applyTheme,
+    zoom: f => { orb.r = clamp(orb.r * f, 3, 35); need = true; tick(); },
+    reset: () => { Object.assign(orb, { tx: 3.69, ty: 0, tz: 4.3, th: 0.35, ph: 0.82, r: 13.5 }); need = true; tick(); },
+  };
+})();
+
+function setMode(m) {
+  S.mode = m;
+  document.getElementById('v2d').setAttribute('aria-pressed', m === '2d');
+  document.getElementById('v3d').setAttribute('aria-pressed', m === '3d');
+  svg.style.visibility = m === '2d' ? '' : 'hidden';
+  document.getElementById('view3d').hidden = m !== '3d';
+  document.getElementById('hud2d').hidden = m !== '2d';
+  document.getElementById('hud3d').hidden = m !== '3d';
+  document.getElementById('status').parentElement.hidden = m !== '2d';
+  if (m === '3d') three.show().then(() => three.syncFurniture()).catch(err => { toast(err.message + '，请检查网络后再试'); setMode('2d'); });
+  else renderOverlay();
+}
+document.getElementById('v2d').onclick = () => setMode('2d');
+document.getElementById('v3d').onclick = () => setMode('3d');
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => three.applyTheme());
+new MutationObserver(() => three.applyTheme()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* ================= boot ================= */
+buildStatic(); renderLib(); applyOpts(); renderSchemes();
+new ResizeObserver(() => { if (!S.fitted && svg.clientWidth > 0) { S.fitted = true; fitView(); } else applyView(); renderOverlay(); }).observe(svg);
+fitView(); refreshAll();
+})();
+</script>
