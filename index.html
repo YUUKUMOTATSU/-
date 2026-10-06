@@ -170,7 +170,7 @@ select.txt{padding:5px 6px}
     <div class="brand">
       <h1>高洲新家布局</h1>
       <span class="meta">3-3-5-203 · 3DK · 54㎡ · 2F</span>
-      <span class="scheme-tag"><span id="dirty-dot" class="dot"></span>方案 <b id="scheme-name">示例方案</b><span id="scheme-state"></span></span>
+      <span class="scheme-tag"><span id="dirty-dot" class="dot"></span>方案 <b id="scheme-name">推荐布局</b><span id="scheme-state"></span></span>
     </div>
     <div class="tools">
       <button class="btn" id="undo" title="撤销 (Ctrl+Z)">撤销</button>
@@ -299,7 +299,7 @@ select.txt{padding:5px 6px}
           <ul class="list schemes" id="schemes"></ul>
         </div>
         <div class="row">
-          <button class="btn small" id="load-sample">载入示例方案</button>
+          <button class="btn small" id="load-sample">恢复推荐布局</button>
         </div>
       </section>
 
@@ -414,6 +414,21 @@ const FIX = [
 ];
 
 const CATALOG = [
+  { cat: '我的家具', items: [
+    { k: 'futon', name: '日式床垫', w: 1000, d: 2000, h: 100, color: '#ECE7DD' },
+    { k: 'mirror', name: '旋转立镜', w: 450, d: 450, h: 1600, color: '#B99470' },
+    { k: 'desk', name: '办公桌', w: 1600, d: 800, h: 720, color: '#B99470' },
+    { k: 'shelf', name: '书架 90', w: 900, d: 350, h: 1800, color: '#A98462' },
+    { k: 'cabinet', name: '洗碗机+碗架', w: 600, d: 460, h: 1300, color: '#ECEDEE' },
+    { k: 'cabinet', name: '冰箱', w: 500, d: 580, h: 1300, color: '#E4E6E7' },
+    { k: 'cabinet', name: '微波炉架', w: 585, d: 390, h: 1500, color: '#9C8B76' },
+    { k: 'tv', name: '电视柜+50寸电视', w: 1150, d: 310, h: 450, color: '#8C6B4F' },
+    { k: 'speaker', name: '音响', w: 195, d: 265, h: 320, color: '#3B4347' },
+    { k: 'table', name: '折叠矮桌', w: 900, d: 600, h: 330, color: '#B99470' },
+    { k: 'sofa', name: '无腿沙发', w: 1160, d: 660, h: 450, color: '#9AA3A8' },
+    { k: 'desk', name: '她的书桌', w: 1200, d: 600, h: 720, color: '#C9AD8A' },
+    { k: 'shelf', name: '书架 60', w: 600, d: 260, h: 1500, color: '#A98462' },
+    { k: 'rack', name: '晾衣架', w: 860, d: 480, h: 1500, color: '#B9BEC2' }] },
   { cat: '卧室', items: [
     { k: 'bed', name: '单人床', w: 970, d: 1950, h: 450, color: '#D9C7AE' },
     { k: 'bed', name: '双人床 1.5m', w: 1500, d: 2000, h: 450, color: '#D9C7AE' },
@@ -451,22 +466,28 @@ const CATALOG = [
 ];
 const COLORS = ['#D9C7AE', '#C9AD8A', '#B99470', '#8C6B4F', '#ECEDEE', '#B9BEC2', '#9AA3A8', '#6F7F95', '#3B4347', '#7F9A78', '#C9A55B', '#B5655A'];
 
+// The user's own furniture (sizes they gave), placed per their brief. x,y = centre in mm; rot 90 = back to +X.
 const SAMPLE = [
-  { k: 'bed', name: '双人床 1.5m', w: 1500, d: 2000, h: 450, x: 6300, y: 5200, rot: 90, color: '#D9C7AE' },
-  { k: 'box', name: '床头柜', w: 450, d: 400, h: 500, x: 7100, y: 6200, rot: 90, color: '#B99470' },
-  { k: 'cabinet', name: '衣柜', w: 1000, d: 600, h: 1900, x: 6795, y: 4135, rot: 0, color: '#A98462' },
-  { k: 'desk', name: '梳妆台', w: 900, d: 450, h: 740, x: 5400, y: 7255, rot: 180, color: '#C9AD8A' },
-  { k: 'desk', name: '书桌', w: 1200, d: 600, h: 720, x: 4900, y: 385, rot: 0, color: '#B99470' },
-  { k: 'chair', name: '办公椅', w: 600, d: 600, h: 1100, x: 4900, y: 950, rot: 180, color: '#3B4347' },
-  { k: 'shelf', name: '书架', w: 800, d: 300, h: 1800, x: 3890, y: 1200, rot: 270, color: '#A98462' },
-  { k: 'bed', name: '单人床', w: 970, d: 1950, h: 450, x: 565, y: 6505, rot: 0, color: '#D9C7AE' },
-  { k: 'cabinet', name: '收纳柜', w: 800, d: 400, h: 900, x: 1940, y: 6800, rot: 90, color: '#C4B39C' },
-  { k: 'cabinet', name: '冰箱', w: 650, d: 700, h: 1800, x: 2590, y: 5265, rot: 270, color: '#E4E6E7' },
-  { k: 'cabinet', name: '微波炉架', w: 600, d: 450, h: 1500, x: 2465, y: 4620, rot: 270, color: '#9C8B76' },
-  { k: 'table', name: '餐桌 2人', w: 750, d: 750, h: 720, x: 3800, y: 5900, rot: 0, color: '#B99470' },
-  { k: 'chair', name: '餐椅', w: 450, d: 500, h: 800, x: 3800, y: 5375, rot: 0, color: '#6F7F95' },
-  { k: 'chair', name: '餐椅', w: 450, d: 500, h: 800, x: 3800, y: 6425, rot: 180, color: '#6F7F95' },
-  { k: 'cabinet', name: '洗衣机', w: 600, d: 600, h: 1000, x: 3340, y: 2250, rot: 0, color: '#ECEDEE' },
+  // 和室② bedroom: two futons head-north, mirror by the door
+  { k: 'futon', name: '日式床垫', w: 1000, d: 2000, h: 100, x: 4290, y: 1600, rot: 0, color: '#ECE7DD' },
+  { k: 'futon', name: '日式床垫', w: 1000, d: 2000, h: 100, x: 5290, y: 1600, rot: 0, color: '#ECE7DD' },
+  { k: 'mirror', name: '旋转立镜', w: 450, d: 450, h: 1600, x: 4325, y: 3455, rot: 180, color: '#B99470' },
+  // 和室① office + TV corner
+  { k: 'desk', name: '办公桌', w: 1600, d: 800, h: 720, x: 6900, y: 6640, rot: 90, color: '#B99470' },
+  { k: 'shelf', name: '书架 90', w: 900, d: 350, h: 1800, x: 6790, y: 4005, rot: 0, color: '#A98462' },
+  { k: 'speaker', name: '音响', w: 195, d: 265, h: 320, x: 7168, y: 4328, rot: 90, color: '#3B4347' },
+  { k: 'tv', name: '电视柜+50寸电视', w: 1150, d: 310, h: 450, x: 7145, y: 5010, rot: 90, color: '#8C6B4F' },
+  { k: 'speaker', name: '音响', w: 195, d: 265, h: 320, x: 7168, y: 5693, rot: 90, color: '#3B4347' },
+  { k: 'sofa', name: '无腿沙发', w: 1160, d: 660, h: 450, x: 4980, y: 5010, rot: 270, color: '#9AA3A8' },
+  { k: 'table', name: '折叠矮桌', w: 900, d: 600, h: 330, x: 6010, y: 5010, rot: 90, color: '#B99470' },
+  // kitchen: along the west wall, left→right facing it = dishwasher, fridge, microwave
+  { k: 'cabinet', name: '洗碗机+碗架', w: 600, d: 460, h: 1300, x: 2470, y: 5290, rot: 270, color: '#ECEDEE' },
+  { k: 'cabinet', name: '冰箱', w: 500, d: 580, h: 1300, x: 2530, y: 4730, rot: 270, color: '#E4E6E7' },
+  { k: 'cabinet', name: '微波炉架', w: 585, d: 390, h: 1500, x: 2435, y: 4178, rot: 270, color: '#9C8B76' },
+  // 和室③ her desk + drying rack by the balcony
+  { k: 'desk', name: '她的书桌', w: 1200, d: 600, h: 720, x: 1840, y: 5700, rot: 90, color: '#C9AD8A' },
+  { k: 'shelf', name: '书架 60', w: 600, d: 260, h: 1500, x: 2010, y: 6650, rot: 90, color: '#A98462' },
+  { k: 'rack', name: '晾衣架', w: 860, d: 480, h: 1500, x: 340, y: 5930, rot: 90, color: '#B9BEC2' },
 ];
 
 /* ================= geometry ================= */
@@ -563,7 +584,7 @@ for (const p of PIECES) {
 }
 
 /* ================= state ================= */
-const LS_DRAFT = 'takasu203.draft.v1', LS_SCHEMES = 'takasu203.schemes.v1', LS_OPTS = 'takasu203.opts.v1';
+const LS_DRAFT = 'takasu203.draft.v2', LS_SCHEMES = 'takasu203.schemes.v1', LS_OPTS = 'takasu203.opts.v1';
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } };
 
@@ -572,7 +593,7 @@ const S = {
   items: [], sel: null,
   view: { x: 0, y: 0, s: 0.08 },
   opts: Object.assign({ snap: true, dims: true, zones: true, low: false }, lsGet(LS_OPTS) || {}),
-  mode: '2d', cur: { id: null, name: '示例方案' }, dirty: false,
+  mode: '2d', cur: { id: null, name: '推荐布局' }, dirty: false,
   status: new Map(),
 };
 const draft = lsGet(LS_DRAFT);
@@ -776,6 +797,8 @@ function symbol(it) {
     case 'shelf': for (let i = 1; i < 3; i++) s += `<line class="f-det" x1="${-hw}" y1="${-hd + d * i / 3}" x2="${hw}" y2="${-hd + d * i / 3}"/>`; break;
     case 'tv': s += `<rect class="f-detf" x="${-hw * .8}" y="${-hd + 40}" width="${w * .8}" height="60" style="fill:#222"/>`; break;
     case 'rack': s += `<line class="f-det" x1="${-hw}" y1="${-hd / 2}" x2="${hw}" y2="${-hd / 2}"/><line class="f-det" x1="${-hw}" y1="${hd / 2}" x2="${hw}" y2="${hd / 2}"/>`; break;
+    case 'mirror': s += `<line class="f-det" x1="${-hw * .7}" y1="${-hd * .25}" x2="${hw * .7}" y2="${-hd * .25}"/><circle class="f-det" r="${Math.min(hw, hd) * .25}"/>`; break;
+    case 'speaker': s += `<circle class="f-det" cx="0" cy="${hd * .35}" r="${Math.min(hw, hd) * .55}"/>`; break;
     case 'plant': { const r = Math.min(w, d) * .3; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; s += `<line class="f-det" x1="0" y1="0" x2="${Math.cos(a) * r * 1.5}" y2="${Math.sin(a) * r * 1.5}"/>`; } break; }
   }
   return s;
@@ -784,7 +807,7 @@ function furnSVG(it) {
   const st = S.status.get(it.id) || {};
   const cls = ['f', it.k === 'rug' ? 'rug' : '', st.lvl || '', S.sel === it.id ? 'sel' : ''].join(' ');
   const hw = it.w / 2, hd = it.d / 2;
-  const body = it.k === 'plant' ? `<ellipse class="f-body" rx="${hw}" ry="${hd}" style="fill:${it.color}"/>`
+  const body = (it.k === 'plant' || it.k === 'mirror') ? `<ellipse class="f-body" rx="${hw}" ry="${hd}" style="fill:${it.color}"/>`
     : `<rect class="f-body" x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" rx="${Math.min(30, it.w / 8, it.d / 8)}" style="fill:${it.color}"/>`;
   // upright label, sized to the item's on-screen footprint
   const c = Math.abs(Math.cos(rad(it.rot))), s = Math.abs(Math.sin(rad(it.rot)));
@@ -925,8 +948,8 @@ function renderStatus() {
 }
 function renderHeader() {
   document.getElementById('scheme-name').textContent = S.cur.name || '未命名方案';
-  document.getElementById('dirty-dot').className = 'dot' + (S.dirty ? ' dirty' : '');
-  document.getElementById('scheme-state').textContent = S.dirty ? '· 有未保存的修改' : '· 已保存';
+  document.getElementById('dirty-dot').className = 'dot' + (S.dirty || !S.cur.id ? ' dirty' : '');
+  document.getElementById('scheme-state').textContent = !S.cur.id ? '· 还没保存' : S.dirty ? '· 有未保存的修改' : '· 已保存';
   const sn = document.getElementById('save-name'); if (document.activeElement !== sn) sn.value = S.cur.name || '';
   document.getElementById('count').textContent = S.items.length ? S.items.length : '';
 }
@@ -997,10 +1020,10 @@ document.getElementById('clear-wrap').addEventListener('click', e => {
 });
 
 /* library */
-let curCat = '全部';
+let curCat = '我的家具';
 function cardIcon(t) {
   const m = Math.max(t.w, t.d), w = 36 * t.w / m, d = 36 * t.d / m;
-  return `<svg viewBox="0 0 44 44" aria-hidden="true"><rect x="${22 - w / 2}" y="${22 - d / 2}" width="${w}" height="${d}" rx="${t.k === 'plant' ? Math.min(w, d) / 2 : 2}" fill="${t.color}" stroke="rgba(0,0,0,.35)"/></svg>`;
+  return `<svg viewBox="0 0 44 44" aria-hidden="true"><rect x="${22 - w / 2}" y="${22 - d / 2}" width="${w}" height="${d}" rx="${t.k === 'plant' || t.k === 'mirror' ? Math.min(w, d) / 2 : 2}" fill="${t.color}" stroke="rgba(0,0,0,.35)"/></svg>`;
 }
 function renderLib() {
   const cats = ['全部'].concat(CATALOG.map(c => c.cat));
@@ -1255,7 +1278,7 @@ document.getElementById('schemes').addEventListener('click', async e => {
   }
 });
 document.getElementById('load-sample').onclick = () => {
-  S.items = sampleItems(); S.sel = null; S.cur = { id: null, name: '示例方案' }; commit(); toast('已载入示例方案，可以撤销');
+  S.items = sampleItems(); S.sel = null; S.cur = { id: null, name: '推荐布局' }; commit(); toast('已恢复推荐布局，可以撤销');
 };
 cap('db').then(d => {
   if (!d) return;
@@ -1416,7 +1439,13 @@ const three = (() => {
         add(W * .9, H - sh, .05, 0, sh + (H - sh) / 2, -D / 2 + .05, c);
         for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(lg, sh, lg, sx * (W * .42), sh / 2, sz * (D * .38), 0x555555);
         break; }
-      case 'tv': add(W, H, D, 0, H / 2, 0, c); add(W * .8, W * .8 * .56, .05, 0, H + W * .8 * .28 + .02, -D / 2 + .1, 0x1E1E1E); break;
+      case 'tv': { const sw = Math.min(W * .97, 1.12), sh = sw * .5625; add(W, H, D, 0, H / 2, 0, c); add(.3, .02, .2, 0, H + .01, 0, 0x2A2A2A); add(sw, sh, .04, 0, H + .06 + sh / 2, -D / 2 + .1, 0x1E1E1E); break; }
+      case 'speaker': add(W, H, D, 0, H / 2, 0, c); break;
+      case 'mirror': {
+        const r = Math.min(W, D) / 2;
+        const body = new T.Mesh(new T.CylinderGeometry(r, r, H, 28), mat(c)); body.position.y = H / 2; body.castShadow = true; g.add(body);
+        add(r * 1.3, H * .85, .01, 0, H * .5, r + .002, 0xCFDDE3, { roughness: .05, metalness: .3 });
+        break; }
       case 'rug': add(W, .012, D, 0, .006, 0, c); break;
       case 'plant': {
         const r = Math.min(W, D) / 2;
