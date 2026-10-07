@@ -88,6 +88,7 @@ button,input,select{font:inherit;color:inherit}
 .sel-head input{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--panel);font-weight:500}
 .sel-room{font-size:12px;color:var(--ink-2);white-space:nowrap}
 .fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sel .fields{grid-template-columns:repeat(4,minmax(0,1fr))}
 .field{display:grid;gap:3px;font-size:12px;color:var(--ink-2)}
 .field span{letter-spacing:.04em}
 .field .inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--panel);padding-right:7px}
@@ -231,6 +232,7 @@ select.txt{padding:5px 6px}
           <label class="field"><span>宽</span><span class="inp"><input id="sel-w" type="number" min="5" step="1" inputmode="decimal"><em>cm</em></span></label>
           <label class="field"><span>深</span><span class="inp"><input id="sel-d" type="number" min="5" step="1" inputmode="decimal"><em>cm</em></span></label>
           <label class="field"><span>高</span><span class="inp"><input id="sel-h" type="number" min="1" step="1" inputmode="decimal"><em>cm</em></span></label>
+          <label class="field"><span>离地</span><span class="inp"><input id="sel-z" type="number" min="0" step="1" inputmode="decimal"><em>cm</em></span></label>
         </div>
         <div class="row">
           <label class="field" style="width:96px"><span>角度</span><span class="inp"><input id="sel-rot" type="number" step="1"><em>°</em></span></label>
@@ -429,7 +431,9 @@ const CATALOG = [
     { k: 'sofa', name: '无腿沙发', w: 1160, d: 660, h: 450, color: '#9AA3A8' },
     { k: 'desk', name: '她的书桌', w: 1200, d: 600, h: 720, color: '#C9AD8A' },
     { k: 'shelf', name: '书架 60', w: 600, d: 260, h: 1500, color: '#A98462' },
-    { k: 'rack', name: '晾衣架', w: 860, d: 480, h: 1500, color: '#B9BEC2' }] },
+    { k: 'rack', name: '晾衣架', w: 860, d: 480, h: 1500, color: '#B9BEC2' },
+    { k: 'ac', name: '空调内机 14畳', w: 800, d: 270, h: 295, z: 2000, color: '#F4F4F2' },
+    { k: 'acout', name: '空调外机', w: 880, d: 400, h: 750, color: '#E2E3E1' }] },
   { cat: '以后可能用', items: [
     { k: 'futon', name: '沙发床（展开）', w: 1160, d: 1900, h: 250, color: '#9AA3A8' },
     { k: 'futon', name: '客用床垫', w: 1000, d: 2000, h: 100, color: '#E6E0D2' },
@@ -487,6 +491,9 @@ const SAMPLE = [
   { k: 'tv', name: '电视柜+50寸电视', w: 1150, d: 310, h: 450, x: 7145, y: 5010, rot: 90, color: '#8C6B4F' },
   { k: 'speaker', name: '音响', w: 195, d: 265, h: 320, x: 7168, y: 5693, rot: 90, color: '#3B4347' },
   { k: 'sofa', name: '无腿沙发', w: 1160, d: 660, h: 450, x: 4980, y: 5010, rot: 270, color: '#9AA3A8' },
+  { k: 'ac', name: '空调内机 14畳', w: 800, d: 270, h: 295, z: 2000, x: 5100, y: 7345, rot: 180, color: '#F4F4F2' },
+  // outdoor unit on the solid wall between the two balcony windows: back 10 cm off the wall, blowing toward the railing
+  { k: 'acout', name: '空调外机', w: 880, d: 400, h: 750, x: 2400, y: 7940, rot: 0, color: '#E2E3E1' },
   { k: 'table', name: '折叠矮桌', w: 900, d: 600, h: 330, x: 6010, y: 5010, rot: 90, color: '#B99470' },
   // kitchen: along the west wall, left→right facing it = dishwasher, fridge, microwave
   { k: 'cabinet', name: '洗碗机+碗架', w: 600, d: 460, h: 1300, x: 2470, y: 5290, rot: 270, color: '#ECEDEE' },
@@ -660,6 +667,7 @@ const SVG_CSS = `
 .f-detf{fill:rgba(255,255,255,.35);stroke:rgba(20,28,30,.38);stroke-width:1px;vector-effect:non-scaling-stroke}
 .f-shade{fill:rgba(20,28,30,.10);stroke:none}
 .f.rug .f-body{fill-opacity:.55;stroke-dasharray:6 4}
+.f.high .f-body{fill-opacity:.7;stroke-dasharray:5 3}
 .f.warn .f-body{stroke:var(--warn);stroke-width:2.5px}
 .f.bad .f-body{stroke:var(--bad);stroke-width:2.5px}
 .f.sel .f-body{stroke:var(--accent);stroke-width:2.5px}
@@ -806,6 +814,8 @@ function symbol(it) {
     case 'tv': s += `<rect class="f-detf" x="${-hw * .8}" y="${-hd + 40}" width="${w * .8}" height="60" style="fill:#222"/>`; break;
     case 'rack': s += `<line class="f-det" x1="${-hw}" y1="${-hd / 2}" x2="${hw}" y2="${-hd / 2}"/><line class="f-det" x1="${-hw}" y1="${hd / 2}" x2="${hw}" y2="${hd / 2}"/>`; break;
     case 'crib': s += `<rect class="f-detf" x="${-hw + 50}" y="${-hd + 50}" width="${Math.max(0, w - 100)}" height="${Math.max(0, d - 100)}"/>`; for (let x = -hw + 120; x < hw - 60; x += 110) s += `<line class="f-det" x1="${x}" y1="${-hd}" x2="${x}" y2="${-hd + 50}"/><line class="f-det" x1="${x}" y1="${hd - 50}" x2="${x}" y2="${hd}"/>`; break;
+    case 'ac': s += `<line class="f-det" x1="${-hw + 40}" y1="${hd - 50}" x2="${hw - 40}" y2="${hd - 50}"/><line class="f-det" x1="${-hw + 40}" y1="${hd - 90}" x2="${hw - 40}" y2="${hd - 90}"/>`; break;
+    case 'acout': { const r = Math.min(d * .38, w * .26); s += `<circle class="f-det" cx="${-hw + w * .38}" cy="0" r="${r}"/><line class="f-det" x1="${-hw + w * .38 - r}" y1="0" x2="${-hw + w * .38 + r}" y2="0"/><line class="f-det" x1="${-hw + w * .38}" y1="${-r}" x2="${-hw + w * .38}" y2="${r}"/><rect class="f-detf" x="${hw - w * .2}" y="${-hd + 40}" width="${w * .14}" height="${d - 80}"/>`; break; }
     case 'mirror': s += `<line class="f-det" x1="${-hw * .7}" y1="${-hd * .25}" x2="${hw * .7}" y2="${-hd * .25}"/><circle class="f-det" r="${Math.min(hw, hd) * .25}"/>`; break;
     case 'speaker': s += `<circle class="f-det" cx="0" cy="${hd * .35}" r="${Math.min(hw, hd) * .55}"/>`; break;
     case 'plant': { const r = Math.min(w, d) * .3; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; s += `<line class="f-det" x1="0" y1="0" x2="${Math.cos(a) * r * 1.5}" y2="${Math.sin(a) * r * 1.5}"/>`; } break; }
@@ -814,7 +824,7 @@ function symbol(it) {
 }
 function furnSVG(it) {
   const st = S.status.get(it.id) || {};
-  const cls = ['f', it.k === 'rug' ? 'rug' : '', st.lvl || '', S.sel === it.id ? 'sel' : ''].join(' ');
+  const cls = ['f', it.k === 'rug' ? 'rug' : '', it.z > 0 ? 'high' : '', st.lvl || '', S.sel === it.id ? 'sel' : ''].join(' ');
   const hw = it.w / 2, hd = it.d / 2;
   const body = (it.k === 'plant' || it.k === 'mirror') ? `<ellipse class="f-body" rx="${hw}" ry="${hd}" style="fill:${it.color}"/>`
     : `<rect class="f-body" x="${-hw}" y="${-hd}" width="${it.w}" height="${it.d}" rx="${Math.min(30, it.w / 8, it.d / 8)}" style="fill:${it.color}"/>`;
@@ -834,7 +844,7 @@ function furnSVG(it) {
 /* clearances: free distance from the selected item's bounding box to the nearest wall / fixture / furniture */
 function clearances(it) {
   const bb = bbox(corners(it));
-  const obs = OBST.concat(FIXR, S.items.filter(o => o !== it && o.k !== 'rug').map(o => bbox(corners(o))));
+  const obs = OBST.concat(FIXR.filter((r, i) => fixVOv(it, FIX[i])), S.items.filter(o => o !== it && o.k !== 'rug' && vOv(it, o)).map(o => bbox(corners(o))));
   const out = [];
   const best = { l: null, r: null, u: null, d: null };
   for (const r of obs) {
@@ -878,6 +888,9 @@ function overlaySVG() {
 }
 
 /* status: overlaps, blocked doors, outside */
+const zr = it => [it.z || 0, (it.z || 0) + it.h];
+const vOv = (a, b) => { const [a0, a1] = zr(a), [b0, b1] = zr(b); return Math.min(a1, b1) - Math.max(a0, b0) > 1; };
+const fixVOv = (it, f) => (it.z || 0) < f.h;
 const OK_PAIRS = { chair: ['table', 'desk'], table: ['chair'], desk: ['chair'] };
 function computeStatus() {
   const polys = new Map(S.items.map(it => [it.id, corners(it)]));
@@ -886,13 +899,13 @@ function computeStatus() {
     const P = polys.get(it.id), msgs = []; let lvl = null;
     const add = (l, m) => { if (msgs.some(x => x.m === m)) return; msgs.push({ l, m }); if (l === 'bad') lvl = 'bad'; else if (!lvl) lvl = 'warn'; };
     if (OBST.some(r => overlap(P, rectPoly(r)))) add('bad', '碰到墙或窗户');
-    FIX.forEach((f, i) => { if (overlap(P, rectPoly(FIXR[i]))) add('bad', '压到' + f.name); });
+    FIX.forEach((f, i) => { if (fixVOv(it, f) && overlap(P, rectPoly(FIXR[i]))) add('bad', '压到' + f.name); });
     if (it.k !== 'rug') {
       for (const o of S.items) {
-        if (o === it || o.k === 'rug' || (OK_PAIRS[it.k] || []).includes(o.k)) continue;
+        if (o === it || o.k === 'rug' || (OK_PAIRS[it.k] || []).includes(o.k) || !vOv(it, o)) continue;
         if (overlap(P, polys.get(o.id))) add('bad', '和「' + o.name + '」重叠');
       }
-      for (const z of ZONES) if (overlap(P, z.poly)) add('warn', z.msg);
+      if (!(it.z > 0)) for (const z of ZONES) if (overlap(P, z.poly)) add('warn', z.msg);
     }
     const room = roomAt(it.x, it.y);
     if (!room || room.shared) add('warn', '不在屋里');
@@ -933,7 +946,7 @@ function toWorld(e) {
 /* ================= render ================= */
 const gFurn = document.getElementById('g-furn'), gOver = document.getElementById('overlay');
 function renderFurn() {
-  const order = S.items.slice().sort((a, b) => (a.k === 'rug' ? 0 : 1) - (b.k === 'rug' ? 0 : 1));
+  const order = S.items.slice().sort((a, b) => ((a.k === 'rug' ? 0 : 1) + (a.z > 0 ? 2 : 0)) - ((b.k === 'rug' ? 0 : 1) + (b.z > 0 ? 2 : 0)));
   gFurn.innerHTML = order.map(furnSVG).join('');
 }
 function renderOverlay() { gOver.innerHTML = overlaySVG(); }
@@ -970,7 +983,7 @@ function renderSel() {
   const it = byId(S.sel);
   selEl.hidden = !it; if (!it) return;
   const set = (id, v) => { const el = document.getElementById(id); if (document.activeElement !== el) el.value = v; };
-  set('sel-name', it.name); set('sel-w', cmStr(it.w)); set('sel-d', cmStr(it.d)); set('sel-h', cmStr(it.h)); set('sel-rot', Math.round(it.rot));
+  set('sel-name', it.name); set('sel-w', cmStr(it.w)); set('sel-d', cmStr(it.d)); set('sel-h', cmStr(it.h)); set('sel-z', cmStr(it.z || 0)); set('sel-rot', Math.round(it.rot));
   const st = S.status.get(it.id) || { msgs: [] };
   document.getElementById('sel-room').textContent = st.room ? st.room.name : '';
   document.getElementById('sel-warn').innerHTML = st.msgs.length ? st.msgs.map(m => `<li class="${m.l}">${esc(m.m)}</li>`).join('') : '<li class="ok">位置没有问题</li>';
@@ -985,6 +998,7 @@ selEl.addEventListener('change', e => {
   const id = e.target.id, v = e.target.value;
   if (id === 'sel-name') it.name = v.trim() || it.name;
   else if (id === 'sel-rot') { const n = parseFloat(v); if (isFinite(n)) it.rot = ((n % 360) + 360) % 360; }
+  else if (id === 'sel-z') { const n = parseFloat(v); if (isFinite(n) && n >= 0) it.z = Math.round(n * 10); }
   else if (['sel-w', 'sel-d', 'sel-h'].includes(id)) { const n = parseFloat(v); if (isFinite(n) && n > 0) it[id.slice(4)] = Math.max(id === 'sel-h' ? 10 : 50, Math.round(n * 10)); }
   commit();
 });
@@ -1049,7 +1063,7 @@ function addItem(t, x, y) {
     const r = roomAt(x, y); if (!r || r.shared || r.type === 'balcony') { x = 3500; y = 5000; }
     const n = S.items.filter(i => Math.abs(i.x - x) < 50 && Math.abs(i.y - y) < 50).length; x += n * 150; y += n * 150;
   }
-  const it = { id: uid(), k: t.k, name: t.name, w: t.w, d: t.d, h: t.h, color: t.color, x: Math.round(x), y: Math.round(y), rot: 0 };
+  const it = { id: uid(), k: t.k, name: t.name, w: t.w, d: t.d, h: t.h, z: t.z || 0, color: t.color, x: Math.round(x), y: Math.round(y), rot: 0 };
   S.items.push(it); S.sel = it.id; if (S.mode !== '2d') setMode('2d'); commit();
   if (window.matchMedia('(max-width: 860px)').matches) stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1094,7 +1108,7 @@ function snapMove(it, nx, ny) {
   nx = Math.round(nx / 10) * 10; ny = Math.round(ny / 10) * 10;
   const bb = bbox(corners(Object.assign({}, it, { x: nx, y: ny })));
   const thr = 12 / S.view.s;
-  const rects = OBST.concat(FIXR, S.items.filter(o => o !== it && o.k !== 'rug').map(o => bbox(corners(o))));
+  const rects = OBST.concat(FIXR.filter((r, i) => fixVOv(it, FIX[i])), S.items.filter(o => o !== it && o.k !== 'rug' && vOv(it, o)).map(o => bbox(corners(o))));
   let bx = null, by = null;
   for (const r of rects) {
     if (r.y0 < bb.y1 - 1 && r.y1 > bb.y0 + 1) for (const d of [r.x1 - bb.x0, r.x0 - bb.x1]) if (Math.abs(d) < thr && (bx === null || Math.abs(d) < Math.abs(bx))) bx = d;
@@ -1450,6 +1464,13 @@ const three = (() => {
         break; }
       case 'tv': { const sw = Math.min(W * .97, 1.12), sh = sw * .5625; add(W, H, D, 0, H / 2, 0, c); add(.3, .02, .2, 0, H + .01, 0, 0x2A2A2A); add(sw, sh, .04, 0, H + .06 + sh / 2, -D / 2 + .1, 0x1E1E1E); break; }
       case 'speaker': add(W, H, D, 0, H / 2, 0, c); break;
+      case 'ac': add(W, H, D, 0, H / 2, 0, c); add(W * .9, .04, .01, 0, .06, D / 2 + .005, 0x6E7477); break;
+      case 'acout': {
+        const leg = .1, bh = H - leg;
+        for (const sx of [-1, 1]) add(.06, leg, D, sx * (W / 2 - .05), leg / 2, 0, 0x55595C);
+        add(W, bh, D * .85, 0, leg + bh / 2, -D * .05, c);
+        const fan = new T.Mesh(new T.CircleGeometry(Math.min(bh, W) * .36, 28), mat(0x3A3F42)); fan.position.set(-W / 2 + W * .38, leg + bh / 2, D * .38 + .003); g.add(fan);
+        break; }
       case 'crib': {
         const p = .04, mh = Math.min(.45, H * .45);
         for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(p, H, p, sx * (W / 2 - p / 2), H / 2, sz * (D / 2 - p / 2), c);
@@ -1477,7 +1498,7 @@ const three = (() => {
       case 'rack': add(.03, H, .03, -W / 2, H / 2, 0, c); add(.03, H, .03, W / 2, H / 2, 0, c); add(W, .03, .03, 0, H, 0, c); add(W, .03, D, 0, .03, 0, c); break;
       default: add(W, H, D, 0, H / 2, 0, c);
     }
-    g.position.set(it.x / 1000, 0, it.y / 1000); g.rotation.y = -rad(it.rot);
+    g.position.set(it.x / 1000, (it.z || 0) / 1000, it.y / 1000); g.rotation.y = -rad(it.rot);
     return g;
   }
   function syncFurniture() {
