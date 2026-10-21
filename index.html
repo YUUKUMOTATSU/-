@@ -580,505 +580,2480 @@ const rot2 = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin
 
 
 // ---------- 显微视野：卵子、受精、分裂、囊胚 ----------
-function microBackdrop(c, W, H, t) {
-  const g = c.createRadialGradient(W * .5, H * .5, 0, W * .5, H * .5, Math.max(W, H) * .75);
-  g.addColorStop(0, "#4a1a2b"); g.addColorStop(.6, "#2a0e19"); g.addColorStop(1, "#13070c");
+// 风格：暖色柔光的显微插画。细胞质半透明、带细颗粒，透明带像一圈玻璃；不用深色描边，不画黑点。
+
+// 预渲染的细胞质纹理：第一次用到时生成，之后每帧只贴图（快）
+const mi_SPR = {};
+function mi_sprite(kind, seed) {
+  const key = kind + seed;
+  if (mi_SPR[key]) return mi_SPR[key];
+  const big = kind === "egg", N = big ? 512 : 256, h = N / 2, r = h - 3, k = N / 256;
+  const cv = document.createElement("canvas"); cv.width = cv.height = N;
+  const g = cv.getContext("2d"), q = rng(seed * 7919 + N + (kind === "icm" ? 3 : 0));
+  const C = kind === "icm" ? [[252, 230, 218], [240, 200, 186], [228, 174, 164], [214, 154, 148]]
+    : [[253, 239, 229], [245, 214, 198], [233, 187, 173], [220, 164, 154]];
+  const bg = g.createRadialGradient(h - r * .28, h - r * .32, r * .04, h, h, r);
+  bg.addColorStop(0, rgb(C[0], .97)); bg.addColorStop(.5, rgb(C[1], .95)); bg.addColorStop(.88, rgb(C[2], .94)); bg.addColorStop(1, rgb(C[3], .93));
+  g.beginPath(); g.arc(h, h, r, 0, TAU); g.fillStyle = bg; g.fill();
+  g.save(); g.clip();
+  // 柔和的明暗斑驳
+  for (let i = 0; i < 16; i++) {
+    const a = q() * TAU, rr = Math.sqrt(q()) * r * .8, x = h + Math.cos(a) * rr, y = h + Math.sin(a) * rr, s = r * (.14 + q() * .22);
+    const col = q() < .5 ? [200, 132, 124] : [255, 246, 238], m = g.createRadialGradient(x, y, 0, x, y, s);
+    m.addColorStop(0, rgb(col, .1)); m.addColorStop(1, rgb(col, 0));
+    g.fillStyle = m; g.fillRect(x - s, y - s, 2 * s, 2 * s);
+  }
+  // 细颗粒（中央稍密，边缘留一圈清亮的皮质）
+  const nG = big ? 4200 : 1000;
+  for (let pass = 0; pass < 2; pass++) {
+    g.beginPath();
+    const n = pass ? nG * .5 : nG;
+    for (let i = 0; i < n; i++) { const a = q() * TAU, rr = r * .93 * Math.pow(q(), .55), s = (.55 + q() * 1.05) * (big ? 1.6 : 1.1); circ(g, h + Math.cos(a) * rr, h + Math.sin(a) * rr, s); }
+    g.fillStyle = pass ? "rgba(255,249,242,.3)" : "rgba(160,92,90,.15)"; g.fill();
+  }
+  // 浮雕感：左上一道亮边，右下一道浅影（显微镜相差照片的质感）
+  const hl = g.createRadialGradient(h + r * .2, h + r * .24, 0, h + r * .2, h + r * .24, r * 1.25);
+  hl.addColorStop(0, "rgba(255,250,244,0)"); hl.addColorStop(.74, "rgba(255,250,244,0)"); hl.addColorStop(1, "rgba(255,250,244,.6)");
+  g.fillStyle = hl; g.fillRect(0, 0, N, N);
+  const sh = g.createRadialGradient(h - r * .2, h - r * .24, 0, h - r * .2, h - r * .24, r * 1.25);
+  sh.addColorStop(0, "rgba(150,74,82,0)"); sh.addColorStop(.76, "rgba(150,74,82,0)"); sh.addColorStop(1, "rgba(150,74,82,.28)");
+  g.fillStyle = sh; g.fillRect(0, 0, N, N);
+  g.restore();
+  g.beginPath(); g.arc(h, h, r - .8 * k, 0, TAU); g.lineWidth = 1.6 * k; g.strokeStyle = "rgba(255,240,232,.5)"; g.stroke();
+  return mi_SPR[key] = cv;
+}
+// 卵丘 / 放射冠细胞：边缘柔和、略失焦的小圆细胞
+let mi_SOFT = null;
+function mi_soft() {
+  if (mi_SOFT) return mi_SOFT;
+  const N = 96, h = N / 2, cv = document.createElement("canvas"); cv.width = cv.height = N;
+  const g = cv.getContext("2d");
+  const b = g.createRadialGradient(h - N * .1, h - N * .12, 0, h, h, h);
+  b.addColorStop(0, "rgba(255,244,236,.95)"); b.addColorStop(.5, "rgba(246,214,200,.85)"); b.addColorStop(.8, "rgba(232,186,172,.6)"); b.addColorStop(.93, "rgba(236,196,182,.35)"); b.addColorStop(1, "rgba(236,196,182,0)");
+  g.fillStyle = b; g.fillRect(0, 0, N, N);
+  const n = g.createRadialGradient(h + N * .04, h + N * .05, 0, h + N * .04, h + N * .05, N * .19);
+  n.addColorStop(0, "rgba(214,154,146,.4)"); n.addColorStop(.7, "rgba(214,154,146,.25)"); n.addColorStop(1, "rgba(214,154,146,0)");
+  g.fillStyle = n; g.fillRect(0, 0, N, N);
+  return mi_SOFT = cv;
+}
+// 把纹理贴成半径 r 的球；rot 用来抵消外层旋转，让高光始终在左上
+function mi_spr(c, spr, x, y, r, rot) {
+  const s = r / (spr.width / 2 - 3), w = spr.width * s;
+  if (rot) { c.save(); c.translate(x, y); c.rotate(rot); c.drawImage(spr, -w / 2, -w / 2, w, w); c.restore(); }
+  else c.drawImage(spr, x - w / 2, y - w / 2, w, w);
+}
+function mi_rot(c) { try { const m = c.getTransform(); return Math.atan2(m.b, m.a); } catch (e) { return 0; } }
+function mi_scale(c) { try { const m = c.getTransform(); return Math.hypot(m.a, m.b) || 1; } catch (e) { return typeof DPR === "number" ? DPR : 1; } }
+// 离屏缓存：静止的部分画一次、之后每帧只贴图。同一 key 连续用到两次才建缓存（尺寸一直在变时直接画）
+const mi_C = {};
+function mi_cache(name, key, w, h, paint, eager) {
+  const e = mi_C[name] || (mi_C[name] = { key: null, n: 0, ok: false, cv: null });
+  if (e.key !== key) { e.key = key; e.n = 0; e.ok = false; }
+  if (e.ok) return e.cv;
+  if (++e.n < (eager ? 1 : 2) || w * h > 9e6) return null;
+  if (!e.cv) e.cv = document.createElement("canvas");
+  e.cv.width = Math.max(1, Math.ceil(w)); e.cv.height = Math.max(1, Math.ceil(h));
+  const g = e.cv.getContext("2d"); g.clearRect(0, 0, e.cv.width, e.cv.height); paint(g); e.ok = true;
+  return e.cv;
+}
+
+function mi_bgPaint(c, W, H, cx, cy, R) {
+  const g = c.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * .78);
+  g.addColorStop(0, "#6a3040"); g.addColorStop(R * .9 / (Math.max(W, H) * .78), "#5a2534"); g.addColorStop(.38, "#3d1627"); g.addColorStop(.7, "#280d19"); g.addColorStop(1, "#15070d");
   c.fillStyle = g; c.fillRect(0, 0, W, H);
-  specks(c, W, H, t, 55, "rgba(255,200,215,.08)", 7);
 }
-
-function drawZona(c, cx, cy, R, gapA, gap, alpha) {
-  c.save(); c.globalAlpha = alpha;
-  c.beginPath(); c.arc(cx, cy, R * 1.13, gapA + gap, gapA + TAU);
-  c.lineWidth = R * 0.11; c.strokeStyle = "rgba(255,225,222,.16)"; c.stroke();
-  c.lineWidth = Math.max(1, R * 0.015); c.strokeStyle = "rgba(255,228,226,.45)";
-  c.beginPath(); c.arc(cx, cy, R * 1.185, gapA + gap, gapA + TAU); c.stroke();
-  c.beginPath(); c.arc(cx, cy, R * 1.075, gapA + gap, gapA + TAU); c.stroke();
-  c.restore();
-}
-
-function drawOvum(c, cx, cy, R, t, corona) {
-  if (corona > 0) {
-    const r = rng(11);
-    c.save(); c.globalAlpha = corona;
-    for (let ring = 1; ring >= 0; ring--) {
-      const n = ring ? 32 : 24, rr = R * (ring ? 1.55 : 1.32);
-      c.beginPath();
-      for (let i = 0; i < n; i++) {
-        const a = i / n * TAU + ring * 0.12 + Math.sin(t * 0.4 + i) * 0.02, j = 1 + 0.04 * Math.sin(t * 0.7 + i * 1.3);
-        circ(c, cx + Math.cos(a) * rr * j, cy + Math.sin(a) * rr * j, R * (0.1 + r() * 0.05));
-      }
-      c.fillStyle = ring ? "rgba(226,160,150,.4)" : "rgba(240,188,172,.6)"; c.fill();
-    }
-    c.restore();
+function microBackdrop(c, W, H, t, cx, cy, R) {
+  const D = mi_scale(c), cv = mi_cache("bg", [W, H, D, cx, cy, R].join(), W * D, H * D, g => { g.scale(D, D); mi_bgPaint(g, W, H, cx, cy, R); });
+  if (cv) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(cv, 0, 0); c.restore(); }   // 按设备像素 1:1 贴图（不缩放最快）
+  else mi_bgPaint(c, W, H, cx, cy, R);
+  // 失焦的小颗粒（散景），缓慢漂移
+  const q = rng(77), S = Math.min(W, H);
+  c.beginPath();
+  for (let i = 0; i < 14; i++) {
+    const r = S * (.014 + q() * .03), span = W + 2 * r, x = ((q() * span + t * (2 + q() * 4)) % span) - r, y = q() * H + Math.sin(t * .2 + i) * 8;
+    circ(c, x, y, r);
   }
-  drawZona(c, cx, cy, R, 0, 0, 1);
-  const g = c.createRadialGradient(cx - R * .3, cy - R * .35, R * .1, cx, cy, R);
-  g.addColorStop(0, "#fbe4d8"); g.addColorStop(.7, "#e8b2a3"); g.addColorStop(1, "#c88274");
-  c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.fillStyle = g; c.fill();
-  const r2 = rng(3); c.fillStyle = "rgba(140,60,60,.16)"; c.beginPath();
-  for (let i = 0; i < 90; i++) { const a = r2() * TAU, rr = Math.sqrt(r2()) * R * .92; circ(c, cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, R * (.008 + r2() * .015)); }
-  c.fill();
+  c.fillStyle = "rgba(255,214,206,.035)"; c.fill();
+  c.lineWidth = 1; c.strokeStyle = "rgba(255,226,218,.04)"; c.stroke();
+  specks(c, W, H, t, 46, "rgba(255,216,206,.09)", 7);
 }
 
-function nucleus(c, x, y, r, col) {
-  c.beginPath(); circ(c, x, y, r); c.fillStyle = col || "rgba(255,240,235,.55)"; c.fill();
-  c.lineWidth = Math.max(1, r * 0.08); c.strokeStyle = "rgba(150,70,80,.35)"; c.stroke();
-  c.beginPath(); circ(c, x + r * .15, y - r * .1, r * .28); c.fillStyle = "rgba(170,80,95,.5)"; c.fill();
-}
-
-function drawSperm(c, x, y, ang, len, t, ph, alpha) {
-  const ux = Math.cos(ang), uy = Math.sin(ang), nx = -uy, ny = ux;
-  c.save(); c.globalAlpha = alpha;
-  c.beginPath(); c.moveTo(x, y);
-  for (let k = 1; k <= 22; k++) {
-    const s = k / 22, off = Math.sin(s * 9 - t * 12 + ph) * len * 0.08 * s;
-    c.lineTo(x - ux * len * s + nx * off, y - uy * len * s + ny * off);
+// 透明带：一圈玻璃质的厚壳，内外缘发亮，带极细的放射纹；gapA/gapH 是孵化时的裂口
+function drawZona(c, cx, cy, rin, rout, gapA, gapH, alpha, lr) {
+  if (alpha <= .01) return;
+  const L = lr == null ? -2.36 : lr;
+  if (gapH < .001 && Math.abs(L + 2.36) < .03) {   // 完整的一圈：用缓存
+    const D = mi_scale(c), E = rout + (rout - rin) * .6 + 3, cv = mi_cache("zona", [rin, rout, D].join(), 2 * E * D, 2 * E * D, g => { g.scale(D, D); mi_zonaPaint(g, E, E, rin, rout, 0, 0, -2.36); });
+    if (cv) { const A = c.globalAlpha; c.globalAlpha = A * alpha; c.drawImage(cv, cx - E, cy - E, 2 * E, 2 * E); c.globalAlpha = A; return; }
   }
-  c.strokeStyle = "rgba(240,230,236,.75)"; c.lineWidth = Math.max(1, len * 0.018); c.stroke();
-  c.translate(x, y); c.rotate(ang);
-  c.beginPath(); c.ellipse(len * 0.02, 0, len * 0.07, len * 0.045, 0, 0, TAU); c.fillStyle = "#f7eff3"; c.fill();
-  c.restore();
+  const A = c.globalAlpha; c.globalAlpha = A * alpha;
+  mi_zonaPaint(c, cx, cy, rin, rout, gapA, gapH, L);
+  c.globalAlpha = A;
 }
-
-function cellLayout(n) {
-  if (n === 2) return [[-.48, 0, .5], [.48, .02, .5]];
-  if (n === 4) return [[-.44, -.34, .43], [.44, -.3, .43], [-.4, .36, .43], [.42, .38, .43]];
-  const out = [], rr = 0.98 / Math.sqrt(n) * 1.08;
-  for (let k = 0; k < n; k++) { const r = 0.82 * Math.sqrt((k + 0.5) / n), a = k * 2.39996; out.push([Math.cos(a) * r, Math.sin(a) * r, rr]); }
-  return out;
-}
-
-function drawCells(c, cx, cy, R, n, t) {
-  for (const [x, y, r] of cellLayout(n)) {
-    const px = cx + x * R, py = cy + y * R, pr = r * R * (1 + 0.015 * Math.sin(t * 1.3 + x * 5));
-    const g = c.createRadialGradient(px - pr * .35, py - pr * .4, pr * .1, px, py, pr);
-    g.addColorStop(0, "#fde6db"); g.addColorStop(.75, "#eab3a3"); g.addColorStop(1, "#c98475");
-    c.beginPath(); circ(c, px, py, pr); c.fillStyle = g; c.fill();
-    c.lineWidth = Math.max(1, R * .012); c.strokeStyle = "rgba(150,70,70,.35)"; c.stroke();
-    nucleus(c, px + pr * .1, py, pr * .26);
-  }
-}
-
-function drawBlastocyst(c, cx, cy, R, hatch, t) {
-  const B = R * (0.92 + 0.16 * hatch);
-  if (hatch < 1) drawZona(c, cx, cy, R * (1 + .05 * hatch), 0.5, hatch * 1.4, 1 - hatch * 0.7);
-  const g = c.createRadialGradient(cx, cy, B * .1, cx, cy, B);
-  g.addColorStop(0, "rgba(255,215,215,.12)"); g.addColorStop(1, "rgba(240,170,170,.38)");
-  c.beginPath(); circ(c, cx, cy, B); c.fillStyle = g; c.fill();
-  const n = 28;
+function mi_zonaPaint(c, cx, cy, rin, rout, gapA, gapH, L) {
+  const th = rout - rin, a0 = gapA + gapH, a1 = gapA + TAU - gapH;
+  c.save();
+  const og = c.createRadialGradient(cx, cy, rout, cx, cy, rout + th * .6);
+  og.addColorStop(0, "rgba(255,232,222,.12)"); og.addColorStop(1, "rgba(255,232,222,0)");
+  c.beginPath(); c.arc(cx, cy, rout + th * .6, a0, a1); c.arc(cx, cy, rout, a1, a0, true); c.closePath(); c.fillStyle = og; c.fill();
+  c.beginPath(); c.arc(cx, cy, rout, a0, a1); c.arc(cx, cy, rin, a1, a0, true); c.closePath();
+  c.fillStyle = "rgba(52,14,28,.14)"; c.fill();   // 透明带本身是清亮的，先压暗一点，和外面的卵丘雾区分开
+  const zg = c.createRadialGradient(cx, cy, rin, cx, cy, rout);
+  zg.addColorStop(0, "rgba(255,238,228,.55)"); zg.addColorStop(.1, "rgba(255,226,212,.22)"); zg.addColorStop(.5, "rgba(255,220,204,.08)"); zg.addColorStop(.88, "rgba(255,228,214,.16)"); zg.addColorStop(1, "rgba(255,240,230,.42)");
+  c.fillStyle = zg; c.fill();
+  c.save(); c.clip();
+  // 玻璃感：左上一片柔和高光，右下略暗
+  const hx = cx + Math.cos(L) * rout * .85, hy = cy + Math.sin(L) * rout * .85, hg = c.createRadialGradient(hx, hy, 0, hx, hy, rout * 1.1);
+  hg.addColorStop(0, "rgba(255,248,242,.55)"); hg.addColorStop(.6, "rgba(255,248,242,.1)"); hg.addColorStop(1, "rgba(255,248,242,0)");
+  c.fillStyle = hg; c.fillRect(cx - rout, cy - rout, 2 * rout, 2 * rout);
+  const sx = cx - Math.cos(L) * rout * .9, sy = cy - Math.sin(L) * rout * .9, sg = c.createRadialGradient(sx, sy, 0, sx, sy, rout * .9);
+  sg.addColorStop(0, "rgba(60,16,30,.18)"); sg.addColorStop(1, "rgba(60,16,30,0)");
+  c.fillStyle = sg; c.fillRect(cx - rout, cy - rout, 2 * rout, 2 * rout);
+  c.beginPath();
+  const n = 160;
   for (let i = 0; i < n; i++) {
-    const a = i / n * TAU, w = 1 + 0.03 * Math.sin(t + i);
-    c.save(); c.translate(cx + Math.cos(a) * B * .93 * w, cy + Math.sin(a) * B * .93 * w); c.rotate(a + Math.PI / 2);
-    c.beginPath(); c.ellipse(0, 0, B * .13, B * .065, 0, 0, TAU); c.fillStyle = "#e6a898"; c.fill();
-    c.lineWidth = 1; c.strokeStyle = "rgba(140,60,60,.35)"; c.stroke();
-    c.beginPath(); c.ellipse(0, 0, B * .04, B * .025, 0, 0, TAU); c.fillStyle = "rgba(255,240,235,.6)"; c.fill();
-    c.restore();
+    const a = lerp(a0, a1, (i + .5) / n), co = Math.cos(a), si = Math.sin(a);
+    c.moveTo(cx + co * (rin + th * .14), cy + si * (rin + th * .14)); c.lineTo(cx + co * (rout - th * .14), cy + si * (rout - th * .14));
   }
-  const ix = cx, iy = cy - B * .55;
-  for (let k = 0; k < 11; k++) {
-    const r = 0.3 * Math.sqrt((k + .5) / 11), a = k * 2.39996;
-    const px = ix + Math.cos(a) * r * B, py = iy + Math.sin(a) * r * B * .7, pr = B * .12;
-    c.beginPath(); circ(c, px, py, pr); c.fillStyle = "#f3c2b3"; c.fill();
-    c.lineWidth = 1; c.strokeStyle = "rgba(150,70,70,.4)"; c.stroke();
-    nucleus(c, px, py, pr * .3);
+  c.lineWidth = Math.max(.6, th * .025); c.strokeStyle = "rgba(255,236,230,.06)"; c.stroke();
+  c.restore();
+  c.lineWidth = Math.max(.8, th * .04); c.strokeStyle = "rgba(255,238,232,.42)";
+  c.beginPath(); c.arc(cx, cy, rout, a0, a1); c.stroke();
+  c.beginPath(); c.arc(cx, cy, rin, a0, a1); c.stroke();
+  c.restore();
+}
+
+// 放射冠与卵丘细胞的固定布局
+let mi_COR = null;
+function mi_corona() {
+  if (mi_COR) return mi_COR;
+  const q = rng(11), cor = [], cum = [];
+  for (let row = 0; row < 3; row++) {
+    const n = [54, 62, 66][row];
+    for (let i = 0; i < n; i++) cor.push({ a: (i + row * .37 + (q() - .5) * .5) / n * TAU, row, l: .8 + q() * .45, w: .85 + q() * .4, ph: q() * TAU, f: q() });
+  }
+  for (let i = 0; i < 230; i++) cum.push({ a: q() * TAU, f: Math.pow(q(), 1.3), s: .7 + q() * .6, ph: q() * TAU });
+  return mi_COR = { cor, cum };
+}
+// 外圈的卵丘：一团很淡的暖雾里散着柔软的圆细胞（排卵前逐渐松散扩张，受精后散开）
+function mi_cumulusPaint(c, R, spread) {
+  const { cum } = mi_corona(), ZO = 1.32 * R, span = R * lerp(.42, .74, spread), A = c.globalAlpha, spr = mi_soft();
+  const Rm = ZO + span + R * .55, m = c.createRadialGradient(0, 0, ZO, 0, 0, Rm);
+  m.addColorStop(0, "rgba(255,224,210,0)"); m.addColorStop(R * .22 / (Rm - ZO), "rgba(255,224,210,.2)"); m.addColorStop(.55, "rgba(255,216,202,.08)"); m.addColorStop(1, "rgba(255,216,202,0)");
+  c.fillStyle = m; c.beginPath(); circ(c, 0, 0, Rm); c.fill();
+  for (const o of cum) {
+    const rr = ZO + R * .34 + span * o.f, r = R * .075 * o.s * (1 + .3 * o.f);
+    c.globalAlpha = A * lerp(.55, .16, o.f);
+    c.drawImage(spr, Math.cos(o.a) * rr - r, Math.sin(o.a) * rr - r, 2 * r, 2 * r);
+  }
+  c.globalAlpha = A;
+}
+function mi_cumulus(c, cx, cy, R, t, spread, disp) {
+  const k = 1 - disp; if (k <= .01) return;
+  const D = mi_scale(c), E = R * 2.75, A = c.globalAlpha, s = lerp(.8, 1, spread) * (1 + disp * .5);
+  const x = cx + Math.sin(t * .13) * R * .012, y = cy + Math.cos(t * .11) * R * .012;
+  const Dc = Math.max(1, D * .55), cv = mi_cache("cum", [R, Dc].join(), 2 * E * Dc, 2 * E * Dc, g => { g.scale(Dc, Dc); g.translate(E, E); mi_cumulusPaint(g, R, 1); });
+  c.globalAlpha = A * k * lerp(.85, 1, spread);
+  if (cv) c.drawImage(cv, x - E * s, y - E * s, 2 * E * s, 2 * E * s);
+  else { c.save(); c.translate(x, y); c.scale(s, s); mi_cumulusPaint(c, R, 1); c.restore(); }
+  c.globalAlpha = A;
+}
+// 内圈的放射冠：一层沿径向略拉长的细胞，紧贴透明带，像一圈柔软的光晕
+function mi_coronaPaint(c, R) {
+  const { cor } = mi_corona(), ZO = 1.32 * R, A = c.globalAlpha, spr = mi_soft();
+  for (let row = 2; row >= 0; row--) {
+    for (const o of cor) {
+      if (o.row !== row) continue;
+      const L = R * (.105 - row * .012) * o.l, w = R * (.07 + row * .006) * o.w, rr = ZO + R * (.085 + row * .1 + (o.f - .5) * .04 * row);
+      c.globalAlpha = A * [.85, .62, .42][row];
+      c.save(); c.translate(Math.cos(o.a) * rr, Math.sin(o.a) * rr); c.rotate(o.a);
+      c.drawImage(spr, -L, -w, 2 * L, 2 * w); c.restore();
+    }
+  }
+  c.globalAlpha = A;
+}
+function mi_coronaCells(c, cx, cy, R, t, disp) {
+  const k = 1 - disp; if (k <= .01) return;
+  const D = mi_scale(c), E = R * 1.82, A = c.globalAlpha, s = 1 + disp * .3;
+  const x = cx + Math.sin(t * .17 + 1) * R * .006, y = cy + Math.cos(t * .15 + 2) * R * .006;
+  const Dc = Math.max(1, D * .75), cv = mi_cache("cor", [R, Dc].join(), 2 * E * Dc, 2 * E * Dc, g => { g.scale(Dc, Dc); g.translate(E, E); mi_coronaPaint(g, R); });
+  c.globalAlpha = A * k;
+  if (cv) c.drawImage(cv, x - E * s, y - E * s, 2 * E * s, 2 * E * s);
+  else { c.save(); c.translate(x, y); c.scale(s, s); mi_coronaPaint(c, R); c.restore(); }
+  c.globalAlpha = A;
+}
+
+// 卵细胞质
+function drawOvum(c, cx, cy, R, t, a) {
+  if (a <= .01) return;
+  const A = c.globalAlpha; c.globalAlpha = A * a;
+  mi_spr(c, mi_sprite("egg", 1), cx, cy, R);
+  c.globalAlpha = A;
+}
+
+// 细胞核：柔和的亮圆 + 珍珠色核仁（不画深色圆点）
+let mi_NUC = null;
+function mi_nucSprites() {
+  if (mi_NUC) return mi_NUC;
+  const mk = (N, f) => { const cv = document.createElement("canvas"); cv.width = cv.height = N; f(cv.getContext("2d"), N / 2); return cv; };
+  const body = rim => mk(128, (g, h) => {
+    const r = h - 3, gr = g.createRadialGradient(h - r * .3, h - r * .35, r * .05, h, h, r);
+    gr.addColorStop(0, "rgba(255,249,244,.6)"); gr.addColorStop(.7, "rgba(252,234,224,.42)"); gr.addColorStop(1, "rgba(246,218,208,.5)");
+    g.beginPath(); g.arc(h, h, r, 0, TAU); g.fillStyle = gr; g.fill();
+    g.lineWidth = r * .06; g.strokeStyle = `rgba(200,136,132,${rim})`; g.stroke();
+    g.beginPath(); g.arc(h, h, r * .88, Math.PI * .95, Math.PI * 1.6); g.lineWidth = r * .05; g.strokeStyle = "rgba(255,252,248,.4)"; g.stroke();
+  });
+  const pearl = mk(48, (g, h) => {
+    const r = h - 1, gr = g.createRadialGradient(h - r * .35, h - r * .4, r * .1, h, h, r);
+    gr.addColorStop(0, "rgba(255,247,240,.95)"); gr.addColorStop(.92, "rgba(220,166,158,.75)"); gr.addColorStop(1, "rgba(220,166,158,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, 2 * h, 2 * h);
+  });
+  return mi_NUC = { soft: body(.26), firm: body(.5), pearl };
+}
+// 细胞核：柔和的亮圆 + 珍珠色核仁（不画深色圆点）；rim 大于 .3 时边缘更清楚（原核）
+function nucleus(c, x, y, r, a, nucl, rim) {
+  if (a <= .01 || r <= 0) return;
+  const S = mi_nucSprites(), A = c.globalAlpha, k = r / 61;
+  c.globalAlpha = A * Math.min(1, a);
+  c.drawImage(rim > .3 ? S.firm : S.soft, x - 64 * k, y - 64 * k, 128 * k, 128 * k);
+  if (nucl) for (const [dx, dy, rr] of nucl) { const pr = rr * r; c.drawImage(S.pearl, x + dx * r - pr * 24 / 23, y + dy * r - pr * 24 / 23, pr * 48 / 23, pr * 48 / 23); }
+  c.globalAlpha = A;
+}
+
+// 精子：珍珠色的扁头 + 逐渐变细、摆动的尾巴
+function drawSperm(c, x, y, ang, len, t, ph, alpha, tailA, headA) {
+  if (alpha <= .01) return;
+  const ta = tailA == null ? 1 : tailA, ha = headA == null ? 1 : headA, A = c.globalAlpha;
+  const ux = Math.cos(ang), uy = Math.sin(ang), nx = -uy, ny = ux, hl = len * .048, hw = len * .03, N = 18, P = [];
+  for (let k = 0; k <= N; k++) {
+    const s = k / N, off = Math.sin(s * 10 - t * 13 + ph) * len * (.01 + .07 * s), al = hl * .9 + len * s * .96;
+    P.push([x - ux * al + nx * off, y - uy * al + ny * off]);
+  }
+  if (ta > .01) {
+    const Lp = [], Rp = [];
+    for (let k = 0; k <= N; k++) {
+      const s = k / N, a = P[Math.max(0, k - 1)], b = P[Math.min(N, k + 1)], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+      const w = s < .12 ? len * .011 : lerp(len * .0075, len * .0018, (s - .12) / .88);
+      Lp.push([P[k][0] - dy / l * w, P[k][1] + dx / l * w]); Rp.push([P[k][0] + dy / l * w, P[k][1] - dx / l * w]);
+    }
+    c.beginPath(); c.moveTo(Lp[0][0], Lp[0][1]);
+    for (let k = 1; k <= N; k++) c.lineTo(Lp[k][0], Lp[k][1]);
+    for (let k = N; k >= 0; k--) c.lineTo(Rp[k][0], Rp[k][1]);
+    c.closePath();
+    const tg = c.createLinearGradient(x, y, P[N][0], P[N][1]);
+    tg.addColorStop(0, "rgba(255,242,238,.85)"); tg.addColorStop(1, "rgba(255,236,232,.06)");
+    c.globalAlpha = A * alpha * ta; c.fillStyle = tg; c.fill();
+  }
+  if (ha <= .01) { c.globalAlpha = A; return; }
+  c.globalAlpha = A * alpha * ha;
+  c.save(); c.translate(x, y); c.rotate(ang + Math.sin(-t * 13 + ph) * .07);
+  const gl = c.createRadialGradient(0, 0, 0, 0, 0, hl * 2.6);
+  gl.addColorStop(0, "rgba(255,240,236,.2)"); gl.addColorStop(1, "rgba(255,240,236,0)");
+  c.fillStyle = gl; c.beginPath(); circ(c, 0, 0, hl * 2.6); c.fill();
+  const hg = c.createLinearGradient(-hl, -hw, hl, hw);
+  hg.addColorStop(0, "rgba(236,214,222,.95)"); hg.addColorStop(1, "rgba(255,252,250,.98)");
+  c.beginPath(); c.ellipse(0, 0, hl, hw, 0, 0, TAU); c.fillStyle = hg; c.fill();
+  c.beginPath(); c.ellipse(hl * .32, -hw * .1, hl * .55, hw * .7, 0, 0, TAU); c.fillStyle = "rgba(255,255,255,.4)"; c.fill();
+  c.restore();
+  c.globalAlpha = A;
+}
+
+// 卵裂：每次分裂的起止时间 [开始, 时长, 各细胞错开的范围]——整数天时都是分裂完成的状态
+const mi_DIV = [[14.74, .22, 0], [15.36, .17, .08], [15.7, .2, .1], [16.2, .18, .2], [16.62, .18, .2]];
+function mi_prog(k, i, n, d) { const [s, du, sp] = mi_DIV[k], f = n > 1 ? (i * .618034) % 1 : 0; return smooth(s + sp * f, s + sp * f + du, d); }
+// 细胞谱系：每个子细胞记得自己的母细胞；三维排布用简单的推挤求得（只算一次）
+let mi_LIN = null;
+function mi_lineage() {
+  if (mi_LIN) return mi_LIN;
+  const q = rng(41), RC = [1, .6, .5, .41, .33, .265];
+  const nrm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const st = [[{ p: [0, 0, 0], ax: [0, 0, 1], seed: 0 }]];
+  for (let k = 0; k < 5; k++) {
+    const next = [], rc = RC[k + 1];
+    st[k].forEach((cell, i) => {
+      let ax;
+      if (k === 0) ax = nrm([Math.cos(-.42), Math.sin(-.42), .2]);
+      else if (k === 1) ax = i ? nrm([.3, .55, .75]) : nrm([.42, .9, -.12]);
+      else { const v = [q() - .5, q() - .5, q() - .5], pa = cell.ax, dt = v[0] * pa[0] + v[1] * pa[1] + v[2] * pa[2]; ax = nrm([v[0] - dt * pa[0], v[1] - dt * pa[1], v[2] - dt * pa[2]]); }
+      const o = rc * .5, p = cell.p;
+      next.push({ p: [p[0] + ax[0] * o, p[1] + ax[1] * o, p[2] + ax[2] * o], ax, seed: cell.seed });
+      next.push({ p: [p[0] - ax[0] * o, p[1] - ax[1] * o, p[2] - ax[2] * o], ax, seed: (cell.seed + k + 1) % 4 });
+    });
+    const lim = 1 - rc * .92, m = rc * 1.62;
+    for (let it = 0; it < 220; it++) {
+      for (let a = 0; a < next.length; a++) for (let b = a + 1; b < next.length; b++) {
+        const P = next[a].p, Q = next[b].p, dx = Q[0] - P[0], dy = Q[1] - P[1], dz = Q[2] - P[2], dd = Math.hypot(dx, dy, dz) || 1e-6;
+        if (dd < m) { const f = (m - dd) / dd * .25; P[0] -= dx * f; P[1] -= dy * f; P[2] -= dz * f; Q[0] += dx * f; Q[1] += dy * f; Q[2] += dz * f; }
+      }
+      for (const cl of next) { const P = cl.p, l = Math.hypot(P[0], P[1], P[2]); if (l > lim) { P[0] *= lim / l; P[1] *= lim / l; P[2] *= lim / l; } }
+    }
+    st.push(next);
+  }
+  return mi_LIN = { st, RC };
+}
+// n 个细胞时的投影布局 [x, y, r, z]（单位：卵细胞半径）
+function cellLayout(n) {
+  const L = mi_lineage(), k = Math.round(Math.log2(n));
+  return L.st[k].map(o => [o.p[0], o.p[1], L.RC[k], o.p[2]]);
+}
+// 桑椹胚表面淡淡的细胞边界
+function mi_morulaLines(c, x, y, R, a) {
+  if (a <= .01) return;
+  c.beginPath();
+  for (const [px, py, r, z] of cellLayout(32)) if (z > -.05) circ(c, x + px * R * .9, y + py * R * .9, r * R * 1.15);
+  c.lineWidth = Math.max(.7, R * .008); c.strokeStyle = `rgba(255,238,230,${.2 * a})`; c.stroke();
+}
+
+let mi_RING = null;
+function mi_ringSpr() {
+  if (mi_RING) return mi_RING;
+  const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+  const g = cv.getContext("2d"), sh = g.createRadialGradient(64, 64, 64 * .9 / 1.16, 64, 64, 64);
+  sh.addColorStop(0, "rgba(96,32,44,.26)"); sh.addColorStop(1, "rgba(96,32,44,0)");
+  g.fillStyle = sh; g.beginPath(); g.arc(64, 64, 64, 0, TAU); g.fill();
+  return mi_RING = cv;
+}
+// 卵裂期：从受精卵分到 32 个细胞，最后致密化成桑椹胚。
+// 细胞不透明；正在分裂的一对细胞沿分裂面各占一半（像沙漏一样从中间慢慢收紧），接触处有一道柔和的阴影。
+function drawCells(c, cx, cy, R, d, t) {
+  const L = mi_lineage(), A = c.globalAlpha;
+  let k = 0; while (k < 4 && d >= mi_DIV[k + 1][0]) k++;
+  const par = L.st[k], kids = L.st[k + 1], r0 = L.RC[k], r1 = L.RC[k + 1], cp = smooth(17.15, 17.85, d), list = [];
+  kids.forEach((ch, j) => {
+    const pi = j >> 1, e = mi_prog(k, pi, par.length, d), p = par[pi].p, odd = j & 1;
+    const sc = (1 - .1 * cp) * (1 + .004 * Math.sin(t * .8 + pi));
+    const sib = kids[j ^ 1].p, dv = [ch.p[0] - sib[0], ch.p[1] - sib[1], ch.p[2] - sib[2]], dl = Math.hypot(dv[0], dv[1], dv[2]) || 1, inP = Math.hypot(dv[0], dv[1]) / dl;
+    const x = lerp(p[0], ch.p[0], e) * sc, y = lerp(p[1], ch.p[1], e) * sc;
+    // 分裂中的一对：两半在同一深度连着画；分裂面 = 两个子细胞当前圆心连线的垂直平分线（等大的两个圆，两半拼起来正好是两个圆的并集）
+    const dividing = e < 1 && inP > .5;
+    const mx = lerp(p[0], (ch.p[0] + sib[0]) / 2, e) * sc, my = lerp(p[1], (ch.p[1] + sib[1]) / 2, e) * sc, ip = Math.hypot(dv[0], dv[1]) || 1;
+    list.push({ x, y, z: dividing ? lerp(p[2], (ch.p[2] + sib[2]) / 2, e) + (odd ? 1e-4 : 0) : lerp(p[2], ch.p[2], e), r: lerp(r0, r1, smooth(0, .7, e)) * (1 + .15 * cp), e,
+      seed: e < 1 ? par[pi].seed : ch.seed, cut: dividing ? [dv[0] / ip, dv[1] / ip, 0, 0, mx, my] : null });
+  });
+  list.sort((a, b) => a.z - b.z);
+  for (const o of list) {
+    const x = cx + o.x * R, y = cy + o.y * R, r = o.r * R;
+    c.save();
+    if (o.cut) {   // 分裂中：只画自己这一半（分裂面是两个细胞中点的垂直平分面）
+      const [nx, ny] = o.cut, mx = cx + o.cut[4] * R, my = cy + o.cut[5] * R, BIG = R * 3;
+      c.beginPath(); c.moveTo(mx - ny * BIG, my + nx * BIG); c.lineTo(mx + ny * BIG, my - nx * BIG);
+      c.lineTo(mx + ny * BIG + nx * BIG, my - nx * BIG + ny * BIG); c.lineTo(mx - ny * BIG + nx * BIG, my + nx * BIG + ny * BIG); c.closePath(); c.clip();
+    }
+    // 落在后面细胞上的柔和接触阴影（预先画好的一圈柔影贴图）
+    c.globalAlpha = A * (o.cut ? smooth(.1, .6, o.e) : 1); c.drawImage(mi_ringSpr(), x - r * 1.16, y - r * 1.16, r * 2.32, r * 2.32);
+    c.globalAlpha = A;
+    c.beginPath(); circ(c, x, y, r * .985); c.fillStyle = "rgba(236,196,182,1)"; c.fill();
+    mi_spr(c, mi_sprite("cell", o.seed), x, y, r);
+    const dk = 1 - smooth(-.6, .4, o.z);
+    if (dk > .02) { c.globalAlpha = A * .2 * dk; c.beginPath(); circ(c, x, y, r); c.fillStyle = "rgb(120,52,64)"; c.fill(); c.globalAlpha = A; }
+    if (o.cut) {   // 分裂沟：沿分裂面的一道柔影，越分越深
+      const [nx, ny] = o.cut, mx = cx + o.cut[4] * R, my = cy + o.cut[5] * R, w = r * .22, fa = .3 * smooth(.05, .5, o.e);
+      const g = c.createLinearGradient(mx, my, mx + nx * w, my + ny * w);
+      g.addColorStop(0, `rgba(150,74,82,${fa})`); g.addColorStop(1, "rgba(150,74,82,0)");
+      c.beginPath(); circ(c, x, y, r); c.clip(); c.fillStyle = g; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+    }
+    c.restore();
+    const na = (1 - smooth(0, .12, o.e) * (1 - smooth(.85, 1, o.e))) * smooth(-.25, .1, o.z) * (1 - cp);
+    if (na > .02) nucleus(c, x - o.r * .1 * R, y - o.r * .05 * R, r * .28, na * .5, [[.25, -.2, .17]]);
+  }
+  c.globalAlpha = A;
+  if (cp > 0) {
+    c.globalAlpha = A * .5 * cp; mi_spr(c, mi_sprite("egg", 2), cx, cy, R * .98); c.globalAlpha = A;
+    mi_morulaLines(c, cx, cy, R, cp);
   }
 }
 
-function sceneMicro(c, W, H, d, t) {
-  microBackdrop(c, W, H, t);
-  const S = Math.min(W, H), cx = W / 2, cy = H * .53, R = S * .2;
-  if (d < 14) {
-    drawOvum(c, cx, cy, R, t, 0.55 + 0.45 * smooth(1, 13, d));
-    if (d < 12) nucleus(c, cx + R * .22, cy - R * .12, R * .2);
-    else { c.beginPath(); circ(c, cx + Math.cos(-.8) * R * .98, cy + Math.sin(-.8) * R * .98, R * .11); c.fillStyle = "#f1c6b8"; c.fill(); }
-  } else if (d < 15) {
-    const p = d - 14;
-    drawOvum(c, cx, cy, R, t, 0.5 * (1 - p));
-    c.beginPath(); circ(c, cx + Math.cos(-.8) * R * .98, cy + Math.sin(-.8) * R * .98, R * .11); c.fillStyle = "#f1c6b8"; c.fill();
-    for (let i = 0; i < 11; i++) {
-      const a = i / 11 * TAU + .3, dist = R * (1.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * .6 + i * 1.7)));
-      drawSperm(c, cx + Math.cos(a) * dist, cy + Math.sin(a) * dist, a + Math.PI, R * 1.1, t, i, 1 - smooth(.5, 1, p));
-    }
-    const q = smooth(.35, 1, p);
-    if (p > .3) { nucleus(c, cx - R * .32 * (1 - q * .7), cy + R * .05, R * .13, "rgba(255,236,230,.7)"); nucleus(c, cx + R * .3 * (1 - q * .7), cy - R * .04, R * .14, "rgba(255,236,230,.7)"); }
-  } else if (d < 19) {
-    drawZona(c, cx, cy, R, 0, 0, 1);
-    const n = d < 16 ? 2 : d < 16.8 ? 4 : d < 17.6 ? 8 : d < 18.4 ? 16 : 32;
-    drawCells(c, cx, cy, R * .98, n, t);
-  } else {
-    drawBlastocyst(c, cx, cy, R, smooth(20, 21.5, d), t);
+// 囊胚：外层滋养层（将来变胎盘）、内细胞团（将来变宝宝）、充满液体的囊胚腔。
+// hatch 0→1：先扩张、透明带变薄并紧贴着囊胚；随后透明带在朝向内膜的一侧裂开一道小口，囊胚从口子里柔软地鼓出一个小包；
+// 最后透明带像一片薄壳从另一侧滑落、变淡消失，鼓包收回，囊胚重新变圆。整个过程中囊胚主体始终在原点、大小连续变化，
+// hatch=1 时半径约 1.08R、圆心在 (cx,cy)、内细胞团朝上，不再画透明带（与着床场景的囊胚完全重合）。
+// opt（只给显微场景用）：cav 囊胚腔形成进度（0=实心桑椹胚，1=完整囊胚），zona:false 不画透明带。
+const mi_ICM = [[-.42, .1], [-.21, .09], [0, .09], [.21, .09], [.42, .1], [-.31, .25], [-.1, .26], [.1, .26], [.31, .25], [-.18, .39], [.04, .41], [.22, .37]];
+const mi_SLIT = 1.8;                                   // 透明带裂口方向（局部角度）：孵化时正好朝下，对着子宫内膜
+function mi_hatchAt(d) { return clamp((d - 19.4) / 1.6, 0, 1); }   // 第 19.4–21 天孵化（显微与着床两个场景共用）
+function drawBlastocyst(c, cx, cy, R, hatch, t, opt) {
+  const cav = opt && opt.cav != null ? opt.cav : 1, zonaOn = !(opt && opt.zona === false), eager = !!(opt && opt.eager);
+  const h = clamp(hatch, 0, 1), rot = mi_rot(c);
+  let m = null; try { m = c.getTransform(); } catch (e) { }
+  if (cav >= 1 && m) {   // 同一状态连续出现（停在某一天）时画一次，之后按设备像素直接贴图（不再旋转缩放，最省）
+    const E = Math.ceil(R * (h > 0 && h < 1 ? 2.1 : 1.62) * Math.hypot(m.a, m.b)) + 2;
+    const cv = mi_cache("blast", [R.toFixed(3), m.a.toFixed(4), m.b.toFixed(4), m.c.toFixed(4), m.d.toFixed(4), h.toFixed(5), zonaOn].join(), 2 * E, 2 * E, g => { g.setTransform(m.a, m.b, m.c, m.d, E, E); mi_blastPaint(g, 0, 0, R, h, t, 1, zonaOn, rot); }, eager);
+    if (cv) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(cv, m.a * cx + m.c * cy + m.e - E, m.b * cx + m.d * cy + m.f - E); c.restore(); return; }
   }
-  return 0.1 / (2 * R);
+  mi_blastPaint(c, cx, cy, R, h, t, cav, zonaOn, rot);
+}
+function mi_blastPaint(c, cx, cy, R, h, t, cav, zonaOn, rot) {
+  const A = c.globalAlpha, ex = smooth(0, .3, h), rel = smooth(.58, 1, h);
+  const lr = -2.36 - rot, lx = Math.cos(lr), ly = Math.sin(lr);
+  const br = 1 + .006 * Math.sin(t * .5);
+  const Bi = R * (lerp(.95, 1, cav) + .07 * ex) * br, Bf = R * 1.08 * br;
+  const rm = lerp(Bi, Bf, rel);                                          // 囊胚主体，始终在原点
+  const ZI = Math.max(R * lerp(1.09, 1, ex), Bi + R * .022), ZO = ZI + R * lerp(.23, .085, ex);
+  // 从裂口鼓出的小包：内切于主体时看不见，鼓出最多约 0.25R，随后收回
+  const ux = Math.cos(mi_SLIT), uy = Math.sin(mi_SLIT);
+  const pp = smooth(.1, .5, h) * (1 - smooth(.6, .95, h)), rb = R * .52;
+  const dB = lerp(rm - rb, ZO + rb * .02, pp);
+  const cs = [[0, 0, rm]]; if (pp > .004) cs.push([ux * dB, uy * dB, rb]);
+  const te = R * lerp(.1, .065, ex), big = rm;
+  const zA = zonaOn ? 1 - smooth(.6, .96, h) : 0;
+  c.save(); c.translate(cx, cy);
+  // 透明带里的卵周隙稍暗一点（透明带滑落时一起淡去）
+  if (zA > .01) { c.globalAlpha = A * zA * (1 - rel); c.beginPath(); circ(c, 0, 0, ZI); c.fillStyle = "rgba(34,9,18,.2)"; c.fill(); c.globalAlpha = A; }
+  // 1) 囊胚腔：清亮的液体，靠近囊壁处微微发亮
+  c.beginPath(); for (const [x, y, r] of cs) circ(c, x, y, r);
+  const fg = c.createRadialGradient(lx * big * .35, ly * big * .35, 0, 0, 0, big * 1.05);
+  fg.addColorStop(0, "rgba(255,232,222,.34)"); fg.addColorStop(.6, "rgba(252,214,202,.3)"); fg.addColorStop(.9, "rgba(248,200,188,.4)"); fg.addColorStop(1, "rgba(248,200,188,.5)");
+  c.fillStyle = fg; c.fill();
+  // 2) 尚未空腔化的部分：实心的细胞团（桑椹胚 → 早期囊胚）。囊胚腔先是偏向一侧的几个浅色小液泡，再慢慢汇合变大
+  if (cav < 1) {
+    const ri = Bi - te, pk = [], g = smooth(0, 1, cav);
+    // 囊胚腔：先在一侧（将来的“对胚极”）出现一个浅色小液泡，逐渐变大、移向中央
+    const rk = ri * lerp(.14, 1, Math.pow(g, .85)), dk = Math.min(ri - rk, ri * lerp(.6, 0, smooth(.3, 1, cav)));
+    if (rk > .5) pk.push([0, dk, rk]);
+    if (pk.length) {   // 液泡里隔着液体仍能看到一点细胞纹理（越小越不透明，不会像一个深色的“瞳孔”）
+      c.save(); c.beginPath(); for (const [x, y, r] of pk) circ(c, x, y, r); c.clip();
+      c.globalAlpha = A * .85 * (1 - smooth(.2, 1, cav)); mi_spr(c, mi_sprite("egg", 2), 0, 0, Bi, -rot); c.globalAlpha = A;
+      // 新生的液泡是清亮的浅色，而不是深色的圆洞
+      const lg = c.createRadialGradient(lx * ri * .3, ly * ri * .3 + ri * .3, 0, 0, ri * .3, ri * 1.1);
+      lg.addColorStop(0, `rgba(255,240,232,${.3 * (1 - cav)})`); lg.addColorStop(1, `rgba(255,236,226,${.12 * (1 - cav)})`);
+      c.fillStyle = lg; c.fillRect(-Bi, -Bi, 2 * Bi, 2 * Bi);
+      c.restore();
+    }
+    c.save(); c.beginPath(); c.rect(-Bi - 2, -Bi - 2, 2 * Bi + 4, 2 * Bi + 4); for (const [x, y, r] of pk) circ(c, x, y, r); c.clip("evenodd");
+    c.beginPath(); circ(c, 0, 0, Bi); c.clip();
+    mi_spr(c, mi_sprite("egg", 2), 0, 0, Bi, -rot);
+    // 致密化以后细胞的轮廓仍隐约可见：表面一层淡淡的细胞小球
+    const ca = (1 - smooth(.1, .8, cav)) * .55;
+    if (ca > .01) {
+      c.globalAlpha = A * ca;
+      for (const [px, py, r, z] of cellLayout(32)) if (z > -.1) mi_spr(c, mi_sprite("cell", 1 + (Math.round(px * 7 + py * 5) & 3)), px * Bi * .9, py * Bi * .9, r * Bi * 1.12, -rot);
+      c.globalAlpha = A;
+    }
+    mi_morulaLines(c, 0, 0, Bi / (lerp(.95, 1, cav) * br || 1), (1 - cav) * .9);
+    for (const [x, y, r] of pk) {   // 液泡边缘：柔和的过渡
+      const sg = c.createRadialGradient(x, y, r, x, y, r + R * .1);
+      sg.addColorStop(0, "rgba(214,150,144,.28)"); sg.addColorStop(1, "rgba(214,150,144,0)");
+      c.fillStyle = sg; c.fillRect(x - r - R * .1, y - r - R * .1, 2 * (r + R * .1), 2 * (r + R * .1));
+    }
+    c.restore();
+  }
+  // 3) 远侧壁上的滋养层细胞，隔着囊胚腔隐约可见
+  const tc = smooth(.3, 1, cav);
+  if (tc > .02) {
+    const nF = 46, nu = new Path2D(), rim = new Path2D();
+    for (let i = 0; i < nF; i++) {
+      const zz = 1 - (i + .5) / nF, rr = Math.sqrt(1 - zz * zz), a = i * 2.39996 + .4;
+      for (let s = 0; s < cs.length; s++) {
+        const [ox, oy, r] = cs[s], o = cs[1 - s], px = ox + Math.cos(a) * rr * (r - te), py = oy + Math.sin(a) * rr * (r - te);
+        if (o && Math.hypot(px - o[0], py - o[1]) < o[2]) continue;
+        const f = Math.max(.4, zz), aa = Math.atan2(py - oy, px - ox), sz = R * .04;
+        nu.moveTo(px + Math.cos(aa) * sz * .6 * f, py + Math.sin(aa) * sz * .6 * f); nu.ellipse(px, py, sz * .6 * f, sz, aa, 0, TAU);
+        const cz = R * .13;
+        rim.moveTo(px + Math.cos(aa) * cz * f, py + Math.sin(aa) * cz * f); rim.ellipse(px, py, cz * f, cz, aa, 0, TAU);
+      }
+    }
+    c.save(); c.beginPath(); for (const [x, y, r] of cs) circ(c, x, y, r - te * .5); c.clip();
+    c.lineWidth = Math.max(.6, R * .006); c.strokeStyle = `rgba(255,236,228,${.09 * tc})`; c.stroke(rim);
+    c.fillStyle = `rgba(255,238,230,${.16 * tc})`; c.fill(nu);
+    c.restore();
+  }
+  // 4) 滋养层：贴着囊壁的一圈扁平细胞，细胞核处向内微微鼓起（两部分的囊壁连成一整圈）
+  if (cav > .02) {
+    c.globalAlpha = A * smooth(0, .6, cav);
+    for (let s = 0; s < cs.length; s++) {
+      const [ox, oy, r] = cs[s], o = cs[1 - s];
+      if (r < te * 1.6) continue;
+      c.save();
+      if (o) { c.beginPath(); c.rect(ox - r - 2, oy - r - 2, 2 * r + 4, 2 * r + 4); circ(c, o[0], o[1], o[2] - te * .3); c.clip("evenodd"); }
+      const tg = c.createLinearGradient(ox + lx * r, oy + ly * r, ox - lx * r, oy - ly * r);
+      tg.addColorStop(0, "rgba(252,226,212,.95)"); tg.addColorStop(1, "rgba(230,176,164,.92)");
+      const n = Math.max(8, Math.round(TAU * r / (R * .26))), bump = new Path2D(), nu = new Path2D(), bd = new Path2D();
+      for (let i = 0; i < n; i++) {
+        const a = (i + .25 * Math.sin(i * 1.7)) / n * TAU, b = (i + .5 + .25 * Math.sin(i * 1.7 + .9)) / n * TAU;
+        const px = ox + Math.cos(a) * (r - te * .9), py = oy + Math.sin(a) * (r - te * .9);
+        if (!(o && Math.hypot(px - o[0], py - o[1]) < o[2] + te)) {
+          const ta = a + Math.PI / 2, L = R * .085, T = te * .62;
+          bump.moveTo(px + Math.cos(ta) * L, py + Math.sin(ta) * L); bump.ellipse(px, py, L, T, ta, 0, TAU);
+          const qx = ox + Math.cos(a) * (r - te * .95), qy = oy + Math.sin(a) * (r - te * .95);
+          nu.moveTo(qx + Math.cos(ta) * L * .55, qy + Math.sin(ta) * L * .55); nu.ellipse(qx, qy, L * .55, T * .55, ta, 0, TAU);
+        }
+        const bx = ox + Math.cos(b) * (r - te * .2), by = oy + Math.sin(b) * (r - te * .2);
+        if (!(o && Math.hypot(bx - o[0], by - o[1]) < o[2])) { bd.moveTo(ox + Math.cos(b) * (r - te * 1.05), oy + Math.sin(b) * (r - te * 1.05)); bd.lineTo(bx, by); }
+      }
+      c.fillStyle = tg; c.fill(bump);
+      c.beginPath(); c.arc(ox, oy, r - te / 2, 0, TAU); c.lineWidth = te; c.strokeStyle = tg; c.stroke();
+      c.fillStyle = "rgba(255,240,230,.32)"; c.fill(nu);
+      c.lineWidth = Math.max(.6, R * .006); c.strokeStyle = "rgba(200,134,130,.2)"; c.stroke(nu);
+      c.strokeStyle = "rgba(196,126,124,.2)"; c.stroke(bd);
+      c.beginPath(); c.arc(ox, oy, r - Math.max(.5, R * .005), 0, TAU); c.lineWidth = Math.max(.8, R * .012); c.strokeStyle = "rgba(255,244,236,.6)"; c.stroke();
+      c.restore();
+    }
+    c.globalAlpha = A;
+  }
+  // 5) 内细胞团：贴在囊壁一侧（朝上）、挤得很紧的一小团细胞
+  const ic = smooth(.15, .7, cav);
+  if (ic > .01) {
+    const top = rm - te * .75;
+    const P = mi_ICM.map(([a, f], i) => { const dd = top - f * R; return [Math.sin(a) * dd, -Math.cos(a) * dd, R * (.13 - .012 * (i % 2))]; });
+    const my = -top + R * .22;
+    c.globalAlpha = A * ic;
+    c.save(); c.beginPath(); for (const [x, y, r] of P) circ(c, x, y, r); c.clip();
+    mi_spr(c, mi_sprite("icm", 1), 0, my, R * .62, -rot);
+    const sg = c.createRadialGradient(lx * R * .3, my + ly * R * .2, 0, 0, my, R * .55);
+    sg.addColorStop(0, "rgba(255,242,234,.35)"); sg.addColorStop(.6, "rgba(255,242,234,0)"); sg.addColorStop(1, "rgba(196,122,122,.22)");
+    c.fillStyle = sg; c.fillRect(-R * .7, my - R * .6, R * 1.4, R * 1.2);
+    c.beginPath(); for (const [x, y, r] of P) circ(c, x, y, r * .96);
+    c.lineWidth = Math.max(.7, R * .009); c.strokeStyle = "rgba(255,238,230,.32)"; c.stroke();
+    for (let i = 0; i < P.length; i += 2) nucleus(c, P[i][0] - P[i][2] * .1, P[i][1] + P[i][2] * .05, P[i][2] * .34, .45, null, .2);
+    c.restore();
+    c.globalAlpha = A;
+  }
+  // 6) 透明带：变薄、贴紧；裂口张开让小包鼓出；随后整片从背侧滑开一点、变淡消失（始终紧挨着囊胚，不会留下一个空圈）
+  if (zA > .01) {
+    let gapH = 0;
+    if (cs.length > 1) { const x = (dB * dB + rm * rm - rb * rb) / (2 * dB); gapH = Math.asin(clamp(Math.sqrt(Math.max(0, rm * rm - x * x)) * 1.12 / ZI, 0, 1)); }
+    gapH = Math.max(gapH, .12 * smooth(.04, .14, h)) + 1.9 * rel;
+    const sh = R * .1 * rel, k = 1 - .05 * rel;
+    drawZona(c, -ux * sh, -uy * sh, ZI * k, ZO * k, mi_SLIT, gapH, zA, lr);
+  }
+  c.restore();
+}
+
+const mi_PB = -2.05, mi_IN = -.62;   // 极体位置、精子进入点（角度）
+// 标本本身（不含精子）：只随天数变化，停在某一天时整层缓存成一张图
+function mi_specimen(c, cx, cy, R, d, t) {
+  const ZI = 1.09 * R, ZO = 1.32 * R, A = c.globalAlpha;
+  const disp = smooth(14.25, 15, d);
+  if (d < 15.2) mi_cumulus(c, cx, cy, R, t, smooth(1, 13.5, d), disp);
+  if (d < 18.1) { c.beginPath(); circ(c, cx, cy, ZI); c.fillStyle = "rgba(34,9,18,.2)"; c.fill(); }
+  // 卵裂（在卵子下面先画，卵子淡出时不会透出背景）
+  if (d >= mi_DIV[0][0] && d < 18.1) drawCells(c, cx, cy, R, d, t);
+  if (d >= 17.8) {
+    // 与着床场景里的囊胚同一位置、同一转角，交叉淡入时不会出现重影
+    c.save(); c.globalAlpha = A * smooth(17.8, 18.1, d); c.translate(cx, cy); c.rotate(-2.44 * smooth(20, 22.6, d));
+    // 与着床场景交叉淡化（19.5–22 天）时两边画的是同一个囊胚：第一次就建缓存，另一边直接贴图
+    drawBlastocyst(c, 0, 0, R, mi_hatchAt(d), t, { cav: smooth(17.9, 18.9, d), zona: d >= 18.1, eager: d > 19.5 && d < 22 });
+    c.restore();
+  }
+  // 卵子 / 受精卵
+  const eggA = 1 - smooth(0, .35, mi_prog(0, 0, 1, d));
+  if (eggA > 0) {
+    drawOvum(c, cx, cy, R, t, eggA);
+    c.globalAlpha = A * eggA;
+    // 生发泡（卵母细胞核），排卵前消失
+    nucleus(c, cx + R * .24, cy + R * .16, R * .22, 1 - smooth(12.1, 12.7, d), [[.28, -.22, .26]]);
+    // 皮质反应：精子进入后从进入点扩散开的一圈柔光
+    const cf = smooth(14.33, 14.64, d);
+    if (cf > 0 && cf < 1) {
+      const ex = cx + Math.cos(mi_IN) * R, ey = cy + Math.sin(mi_IN) * R, rr = R * 2.1 * cf;
+      c.save(); c.beginPath(); circ(c, cx, cy, R); c.clip();
+      const g = c.createRadialGradient(ex, ey, rr * .7, ex, ey, rr);
+      g.addColorStop(0, "rgba(255,240,226,0)"); g.addColorStop(.75, `rgba(255,240,226,${.3 * (1 - cf)})`); g.addColorStop(1, "rgba(255,240,226,0)");
+      c.fillStyle = g; c.fillRect(ex - rr, ey - rr, 2 * rr, 2 * rr); c.restore();
+    }
+    // 两个原核：从各自位置移到中央、靠在一起，然后融合
+    const pn = smooth(14.42, 14.52, d) * (1 - smooth(14.66, 14.76, d));
+    if (pn > .01) {
+      const m = smooth(14.47, 14.64, d), ax = .85, gr = .6 + .4 * smooth(14.42, 14.56, d);
+      const fr = R * .19 * gr, mr = R * .205 * gr;
+      const fx = lerp(Math.cos(mi_PB) * R * .55, -Math.cos(ax) * R * .18, m), fy = lerp(Math.sin(mi_PB) * R * .55, -Math.sin(ax) * R * .18, m);
+      const mx = lerp(Math.cos(mi_IN) * R * .6, Math.cos(ax) * R * .19, m), my = lerp(Math.sin(mi_IN) * R * .6, Math.sin(ax) * R * .19, m);
+      const halo = c.createRadialGradient(cx, cy, R * .55, cx, cy, R);
+      halo.addColorStop(0, "rgba(255,244,236,0)"); halo.addColorStop(1, `rgba(255,244,236,${.12 * pn})`);
+      c.fillStyle = halo; c.beginPath(); circ(c, cx, cy, R * .98); c.fill();
+      const npb = (px, py, qx, qy) => { const a = Math.atan2(qy - py, qx - px), ca = Math.cos(a), sa = Math.sin(a); return [-.42, -.14, .14, .42].map((s, i) => [ca * (.3 + .06 * (i % 2)) - sa * s, sa * (.3 + .06 * (i % 2)) + ca * s, .12 + .02 * (i % 2)]); };
+      nucleus(c, cx + fx, cy + fy, fr, pn, npb(fx, fy, mx, my), .5);
+      nucleus(c, cx + mx, cy + my, mr, pn, npb(mx, my, fx, fy), .5);
+    }
+    c.globalAlpha = A;
+  }
+  // 极体：第一极体在排卵前排出，第二极体在受精后排出；分裂到 8 细胞后渐渐消失
+  const pbF = 1 - smooth(16.4, 17.2, d);
+  for (const [s0, da] of [[12.6, 0], [14.45, .24]]) {
+    const p = smooth(s0, s0 + .6, d) * pbF;
+    if (p <= .01) continue;
+    c.globalAlpha = A * smooth(0, .25, p);
+    const a = mi_PB + da, rr = R * (.9 + .12 * p);
+    mi_spr(c, mi_sprite("cell", da ? 2 : 3), cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, R * .105 * Math.sqrt(p));
+  }
+  c.globalAlpha = A;
+  if (d < 18.1) drawZona(c, cx, cy, ZI, ZO, 0, 0, 1);
+  if (d < 15.2) mi_coronaCells(c, cx, cy, R, t, disp);
+}
+// 精子：排卵时从四面游来，第一个穿过透明带后其余的散去
+const mi_BAND = [0, 1e9];   // 画面上下文字区之间的可见带（sceneMicro 每帧设置）
+const mi_bandFade = (y, len) => smooth(mi_BAND[0], mi_BAND[0] + len * .8, y) * (1 - smooth(mi_BAND[1] - len * .8, mi_BAND[1], y));
+function mi_sperm(c, cx, cy, R, d, t) {
+  const vis = smooth(13.6, 13.85, d) * (1 - smooth(14.42, 14.75, d)), len = R * 1.1;
+  if (vis > .01) {
+    const q = rng(5);
+    for (let i = 0; i < 8; i++) {
+      const T = 10 + q() * 5, ph = q() * T, a0 = i / 8 * TAU + .35 + (q() - .5) * .4, near = 1.42 + q() * .14, u = ((t + ph) % T) / T;
+      const a = a0 + Math.sin(t * .17 + i) * .12, dist = R * lerp(3.1, near, 1 - Math.pow(1 - u, 1.6));
+      const hx = cx + Math.cos(a) * dist, hy = cy + Math.sin(a) * dist, ang = a + Math.PI + Math.sin(t * 1.1 + i * 2) * .2;
+      const fy = Math.min(mi_bandFade(hy, len), mi_bandFade(hy - Math.sin(ang) * len, len));
+      drawSperm(c, hx, hy, ang, len, t, i * 1.7, vis * .9 * fy * smooth(0, .15, u) * (1 - smooth(.82, 1, u)));
+    }
+  }
+  const wv = smooth(13.6, 13.75, d);
+  if (wv > .01 && d < 14.6) {
+    const dw = d < 14 ? lerp(2.9, 1.345, smooth(13.6, 14, d)) : d < 14.15 ? lerp(1.345, 1.3, smooth(14, 14.15, d)) : lerp(1.3, .97, smooth(14.15, 14.36, d));
+    const a = mi_IN + Math.sin(t * .2) * .02 * (1 - smooth(13.9, 14, d));
+    drawSperm(c, cx + Math.cos(a) * dw * R, cy + Math.sin(a) * dw * R, a + Math.PI + Math.sin(t * 1.3) * .06, len, t, 0, wv, 1 - smooth(14.36, 14.56, d), 1 - smooth(14.36, 14.46, d));
+  }
+}
+let mi_warm = "";
+function sceneMicro(c, W, H, d, t) {
+  // 显微阶段画面很省：趁空闲先把后面宫内背景的缓存建好
+  const wk = [W, H, DPR].join();
+  if (mi_warm !== wk && typeof requestIdleCallback === "function") { mi_warm = wk; requestIdleCallback(() => { try { env_warmup(W, H); } catch (e) { } }); }
+  const S = Math.min(W, H), R = S * .2, X = W / 2, Y = H * .53;
+  microBackdrop(c, W, H, t, X, Y, R);
+  // 整个标本缓缓漂动；进入着床前停稳，和着床场景对齐
+  const still = 1 - smooth(18.8, 19.5, d);
+  const cx = X + Math.sin(t * .23) * R * .025 * still, cy = Y + Math.cos(t * .19) * R * .02 * still;
+  const D = mi_scale(c), E = R * (d < 15.2 ? 2.95 : d > 19.3 ? 2.1 : 1.66);
+  // 卵丘散开的那一小段（14.2–15.2）范围太大，不缓存
+  const cv = d > 14.2 && d < 15.2 ? null : mi_cache("spec", [d, R, D].join(), 2 * E * D, 2 * E * D, g => { g.scale(D, D); g.translate(E, E); mi_specimen(g, 0, 0, R, d, t); });
+  if (cv) c.drawImage(cv, cx - E, cy - E, 2 * E, 2 * E); else mi_specimen(c, cx, cy, R, d, t);
+  // 精子不游进上下两条文字区：靠近时渐渐变淡，并且裁在文字区以内
+  mi_BAND[0] = 48; mi_BAND[1] = H - 40;
+  c.save(); c.beginPath(); c.rect(0, mi_BAND[0] - 6, W, mi_BAND[1] - mi_BAND[0] + 12); c.clip();
+  mi_sperm(c, cx, cy, R, d, t);
+  c.restore();
+  // 上下两条文字区再压暗一点（手机上卵丘细胞的柔光会伸到文字下面）
+  const S0 = Math.min(W, H);
+  if (S0 < 420) {
+    let g = c.createLinearGradient(0, H - 64, 0, H);
+    g.addColorStop(0, "rgba(21,7,13,0)"); g.addColorStop(1, "rgba(21,7,13,.5)");
+    c.fillStyle = g; c.fillRect(0, H - 64, W, 64);
+    g = c.createLinearGradient(0, 0, 0, 64);
+    g.addColorStop(0, "rgba(21,7,13,.4)"); g.addColorStop(1, "rgba(21,7,13,0)");
+    c.fillStyle = g; c.fillRect(0, 0, W, 64);
+  }
+  return .1 / (2 * R);
 }
 
 // ---------- 子宫环境（胚胎期、胎儿期共用） ----------
-function wombBackdrop(c, W, H, cx, cy, R, t, early) {
-  const g = c.createRadialGradient(cx, cy, R * .9, cx, cy, Math.max(W, H) * .8);
-  g.addColorStop(0, "#5e1b2c"); g.addColorStop(.35, "#3a0f1c"); g.addColorStop(1, "#12060b");
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  c.save(); c.strokeStyle = "rgba(255,170,185,.06)"; c.lineWidth = 1.2;
-  for (let i = 0; i < 9; i++) { c.beginPath(); c.ellipse(cx, cy, R * (1.05 + i * .035), R * (1.03 + i * .033), .2, 0, TAU); c.stroke(); }
-  c.restore();
-  const f = c.createRadialGradient(cx - R * .25, cy - R * .3, R * .05, cx, cy, R);
-  f.addColorStop(0, early ? "#bd6070" : "#b9525f"); f.addColorStop(.55, "#80293d"); f.addColorStop(1, "#4d1324");
-  c.beginPath(); circ(c, cx, cy, R); c.fillStyle = f; c.fill();
-  c.lineWidth = Math.max(1, R * .012); c.strokeStyle = "rgba(255,210,218,.25)"; c.stroke();
-  specks(c, W, H, t, 40, "rgba(255,225,230,.14)", 13, cx, cy, R);
+// 画面基调：光透过妈妈的肚皮照进来，羊水是暖暖的桃粉色；子宫壁柔软，羊水里飘着细小的微粒。
+// 不随时间变化的部分画进离屏缓存，每帧只叠加缓慢呼吸的光、光束和漂浮微粒。
+// 小型离屏缓存：同一个 key 直接贴图，不同的 key 重画（每个槽位留 2 张：胚胎期和胎儿期交叉淡化时同时要用）
+// res < 1 时按低分辨率缓存（只用于本来就很虚的光束）
+const env_memo = {};
+function env_cached(slot, key, x, y, w, h, draw, res = 1) {
+  const dpr = (typeof DPR === "number" ? DPR : 1) * res, k = key + "|" + dpr;
+  const list = env_memo[slot] || (env_memo[slot] = []);
+  let e = list.find(o => o.k === k);
+  if (!e) {
+    e = list.length < 2 ? { cv: document.createElement("canvas") } : list.pop();
+    e.k = k; e.s = dpr;
+    const pw = Math.max(1, Math.ceil(w * dpr)), ph = Math.max(1, Math.ceil(h * dpr));
+    if (e.cv.width !== pw || e.cv.height !== ph) { e.cv.width = pw; e.cv.height = ph; }
+    const g = e.cv.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, pw, ph);
+    g.setTransform(dpr, 0, 0, dpr, -x * dpr, -y * dpr);
+    draw(g);
+  } else list.splice(list.indexOf(e), 1);
+  list.unshift(e);
+  return e;
+}
+function env_blit(c, e, x, y) { c.drawImage(e.cv, x, y, e.cv.width / e.s, e.cv.height / e.s); }
+const env_q = v => Math.round(v * 4);
+// 柔光圆点贴图（微粒、光斑、呼吸的光都用它）
+const env_spr = {};
+function env_sprite(name = "dot") {
+  if (env_spr[name]) return env_spr[name];
+  const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+  const g = cv.getContext("2d"), rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  if (name === "glow") { rg.addColorStop(0, "rgba(255,224,198,1)"); rg.addColorStop(.45, "rgba(255,220,196,.42)"); rg.addColorStop(1, "rgba(255,214,190,0)"); }
+  else { rg.addColorStop(0, "rgba(255,240,230,1)"); rg.addColorStop(.45, "rgba(255,236,224,.45)"); rg.addColorStop(1, "rgba(255,232,220,0)"); }
+  g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+  return env_spr[name] = cv;
+}
+// 光源：在孕囊上方偏左（肚皮朝外的一侧），避开左右上角的文字
+function env_light(cx, cy, R) { return [cx - R * .22, cy - R * .5]; }
+
+// 画框层：子宫壁的底色、上方透进来的暖光、四角压暗（只跟画布大小有关）
+function env_frame(g, W, H) {
+  const M = Math.max(W, H), S = Math.min(W, H), R = S * .44, cx = W / 2, cy = H * .52, [lx] = env_light(cx, cy, R);
+  // 子宫壁：中间暖、四角渐暗（保证角上的白字清楚）
+  const bg = g.createRadialGradient(cx, cy - R * .1, R * .85, cx, cy, M * .78);
+  bg.addColorStop(0, "#ad5c68"); bg.addColorStop(.28, "#904656"); bg.addColorStop(.62, "#682e40"); bg.addColorStop(1, "#401727");
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  // 透过肚皮的暖光，在上方的子宫壁上晕开
+  const gl = g.createRadialGradient(lx, cy - R * 1.02, 0, lx, cy - R * 1.02, R * .95);
+  gl.addColorStop(0, "rgba(255,186,150,.34)"); gl.addColorStop(.5, "rgba(255,170,140,.12)"); gl.addColorStop(1, "rgba(255,160,140,0)");
+  g.fillStyle = gl; g.fillRect(lx - R, cy - R * 2, R * 2, R * 2);
+  // 四角压暗：角上叠着白色文字，要保证看得清
+  for (const [vx, vy] of [[0, 0], [W, 0], [0, H], [W, H]]) {
+    const vg = g.createRadialGradient(vx, vy, 0, vx, vy, M * .42);
+    vg.addColorStop(0, "rgba(52,14,30,.62)"); vg.addColorStop(.55, "rgba(52,14,30,.3)"); vg.addColorStop(1, "rgba(52,14,30,0)");
+    g.fillStyle = vg; g.fillRect(vx - M * .42, vy - M * .42, M * .84, M * .84);
+  }
 }
 
+// 孕囊层：周围柔软的肌层、囊外的柔光边、羊水、羊膜（随孕囊大小整体缩放）
+function env_sacdraw(g, cx, cy, R, early) {
+  const [lx, ly] = env_light(cx, cy, R);
+  // 柔软的肌层皱褶：沿孕囊外一圈、切向拉长的柔光团，明暗交替
+  const r = rng(29);
+  for (let i = 0; i < 46; i++) {
+    const a = i / 46 * TAU + r() * .12, rr = R * (1.07 + r() * .5), len = R * (.16 + r() * .2), wid = R * (.035 + r() * .05);
+    const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr, lite = i % 2 === 0;
+    g.save(); g.translate(x, y); g.rotate(a + Math.PI / 2); g.scale(len / wid, 1);
+    const bl = g.createRadialGradient(0, 0, 0, 0, 0, wid);
+    bl.addColorStop(0, lite ? "rgba(255,206,196,.11)" : "rgba(80,22,40,.14)"); bl.addColorStop(1, lite ? "rgba(255,206,196,0)" : "rgba(80,22,40,0)");
+    g.fillStyle = bl; g.beginPath(); circ(g, 0, 0, wid); g.fill(); g.restore();
+  }
+  // 肌层里一层层柔软的纤维：很淡的同心弧
+  g.lineCap = "round";
+  for (let i = 0; i < 26; i++) {
+    const rr = R * (1.06 + r() * .5), a0 = r() * TAU, span = .2 + r() * .4, lite = r() < .6;
+    const ox = (r() - .5) * R * .12, oy = (r() - .5) * R * .12;
+    g.lineWidth = R * (.008 + r() * .014);
+    g.strokeStyle = lite ? `rgba(255,214,206,${.025 + r() * .03})` : `rgba(84,24,44,${.035 + r() * .035})`;
+    g.beginPath(); g.ellipse(cx + ox, cy + oy, rr, rr * (.94 + r() * .1), r() * .6, a0, a0 + span); g.stroke();
+  }
+  // 绒毛膜/蜕膜：孕囊外侧一圈柔亮的边
+  const rim = g.createRadialGradient(cx, cy, R * .97, cx, cy, R * 1.16);
+  rim.addColorStop(0, "rgba(255,196,186,.32)"); rim.addColorStop(.35, "rgba(240,160,160,.14)"); rim.addColorStop(1, "rgba(240,150,150,0)");
+  g.fillStyle = rim; g.beginPath(); circ(g, cx, cy, R * 1.16); g.moveTo(cx + R * .96, cy); g.arc(cx, cy, R * .96, 0, TAU, true); g.fill();
+  // 羊水：被透进来的光照亮，靠光的一侧是桃色，远处渐深成玫瑰色
+  const fl = g.createRadialGradient(lx, ly, R * .02, cx + R * .08, cy + R * .1, R * 1.12);
+  if (early) { fl.addColorStop(0, "#eba68e"); fl.addColorStop(.22, "#d5847c"); fl.addColorStop(.52, "#b9646d"); fl.addColorStop(.82, "#9a4b5e"); fl.addColorStop(1, "#853f55"); }
+  else { fl.addColorStop(0, "#e8a28a"); fl.addColorStop(.22, "#cf7c77"); fl.addColorStop(.52, "#b05b68"); fl.addColorStop(.82, "#924558"); fl.addColorStop(1, "#7d3a50"); }
+  g.fillStyle = fl; g.beginPath(); circ(g, cx, cy, R); g.fill();
+  // 囊壁内侧的柔和暗角（只画靠边的一圈），让羊水有深度
+  const sh = g.createRadialGradient(cx - R * .12, cy - R * .16, R * .62, cx, cy, R * 1.01);
+  sh.addColorStop(0, "rgba(120,40,64,0)"); sh.addColorStop(.8, "rgba(120,40,64,.08)"); sh.addColorStop(1, "rgba(110,34,58,.22)");
+  g.fillStyle = sh; g.beginPath(); circ(g, cx, cy, R); g.moveTo(cx + R * .7, cy); g.arc(cx, cy, R * .7, 0, TAU, true); g.fill();
+  // 羊膜：一圈很薄、有光泽的膜，迎光一侧更亮
+  const mg = g.createLinearGradient(cx - R * .7, cy - R * .8, cx + R * .6, cy + R * .8);
+  mg.addColorStop(0, "rgba(255,238,230,.6)"); mg.addColorStop(.5, "rgba(255,222,220,.22)"); mg.addColorStop(1, "rgba(255,210,214,.12)");
+  g.lineWidth = Math.max(1, R * .008); g.strokeStyle = mg; g.beginPath(); circ(g, cx, cy, R * .996); g.stroke();
+  g.lineWidth = Math.max(2, R * .03); g.strokeStyle = "rgba(255,228,222,.07)"; g.beginPath(); circ(g, cx, cy, R * .975); g.stroke();
+}
+
+
+// 透进羊水里的几道淡光束（预先画好、裁在孕囊内；两组交替淡入淡出）
+function env_rays(g, cx, cy, R, early, set) {
+  g.save(); g.beginPath(); circ(g, cx, cy, R * .995); g.clip();
+  g.globalCompositeOperation = "lighter";
+  const sx = cx - R * .6, sy = cy - R * 1.35, len = R * 2.3, r = rng(set ? 71 : 43);
+  for (let i = 0; i < 3; i++) {
+    const a = .98 + (i + (set ? .5 : 0)) * .22 + (r() - .5) * .06, sp = .02 + .012 * r();
+    const al = (.03 + .018 * r()) * (early ? .8 : 1), bx = Math.cos(a), by = Math.sin(a);
+    for (let k = 0; k < 3; k++) {
+      const ak = al * (k ? .45 : .55), wk = sp * (1 + k * .9);
+      const lg = g.createLinearGradient(sx, sy, sx + bx * len, sy + by * len);
+      lg.addColorStop(0, "rgba(255,226,200,0)"); lg.addColorStop(.32, `rgba(255,226,200,${ak})`); lg.addColorStop(1, "rgba(255,226,200,0)");
+      g.fillStyle = lg; g.beginPath(); g.moveTo(sx, sy);
+      g.lineTo(sx + Math.cos(a - wk) * len, sy + Math.sin(a - wk) * len);
+      g.lineTo(sx + Math.cos(a + wk) * len, sy + Math.sin(a + wk) * len); g.closePath(); g.fill();
+    }
+  }
+  g.restore();
+}
+
+// 孕囊层按“最终大小”缓存：着床后镜头拉近时孕囊从小变大，只需把同一张图缩小贴上去，不用每帧重画
+const env_sacs = [];
+function env_sacLayer(W, H, cx, cy, R, early, kind) {
+  const dpr = (typeof DPR === "number" ? DPR : 1) * (kind && Math.abs(R - Math.min(W, H) * .44) > .01 ? .5 : 1), Rr = Math.max(R, Math.min(W, H) * .44);
+  const k = [kind, early ? 1 : 0, W, H, Rr].map(v => typeof v === "number" ? Math.round(v * 4) : v).join(",") + "|" + dpr;
+  const exact = Math.abs(R - Rr) < .01;
+  let e = env_sacs.find(o => o.k === k && (!exact || (Math.abs(o.cx - cx) < .01 && Math.abs(o.cy - cy) < .01)));
+  if (e) env_sacs.splice(env_sacs.indexOf(e), 1);
+  else {
+    e = env_sacs.find(o => o.k === k);           // 同一张图只是中心挪了一点：原地重画
+    if (e) env_sacs.splice(env_sacs.indexOf(e), 1);
+    else e = env_sacs.length < 6 ? { cv: document.createElement("canvas") } : env_sacs.pop();
+    const ext = Rr * (kind ? 1.02 : 1.7);
+    e.k = k; e.s = dpr; e.cx = cx; e.cy = cy; e.R = Rr;
+    e.ox = Math.floor((cx - ext) * dpr) / dpr; e.oy = Math.floor((cy - ext) * dpr) / dpr;
+    const pw = Math.ceil((cx + ext - e.ox) * dpr), ph = Math.ceil((cy + ext - e.oy) * dpr);
+    if (e.cv.width !== pw || e.cv.height !== ph) { e.cv.width = pw; e.cv.height = ph; }
+    const g = e.cv.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, pw, ph);
+    g.setTransform(dpr, 0, 0, dpr, -e.ox * dpr, -e.oy * dpr);
+    if (kind) env_rays(g, cx, cy, Rr, early, kind === "B" ? 1 : 0); else env_sacdraw(g, cx, cy, Rr, early);
+  }
+  env_sacs.unshift(e);
+  return e;
+}
+function env_sacBlit(c, e, cx, cy, R) {
+  const k = R / e.R;
+  c.drawImage(e.cv, cx + (e.ox - e.cx) * k, cy + (e.oy - e.cy) * k, e.cv.width / e.s * k, e.cv.height / e.s * k);
+}
+
+// 空闲时预先把两种宫内背景（胚胎期 / 胎儿期）的缓存画好，第一次进入这些阶段时不会卡一下
+function env_warmup(W, H) {
+  if (!W || !H) return;
+  const cv = document.createElement("canvas"), d = typeof DPR === "number" ? DPR : 1;
+  cv.width = Math.max(1, Math.round(W * d)); cv.height = Math.max(1, Math.round(H * d));
+  const g = cv.getContext("2d"), S = Math.min(W, H), R = S * .44, cx = W / 2, cy = H * .52;
+  for (const early of [1, 0]) { g.setTransform(d, 0, 0, d, 0, 0); wombBackdrop(g, W, H, cx, cy, R, 0, early); }
+}
+function wombBackdrop(c, W, H, cx, cy, R, t, early) {
+  const A0 = c.globalAlpha;
+  if (Math.abs(R - Math.max(R, Math.min(W, H) * .44)) < .01) {
+    // 平常（孕囊大小不变）：画框层和孕囊层合成一张图，每帧只贴一次
+    // 第一组光束以平均亮度直接画进这张缓存图，每帧只再叠一组明暗起伏的光束（少一次整幅贴图）
+    const key = [W, H, cx, cy, R].map(env_q).join(",") + "," + (early ? 1 : 0);
+    env_blit(c, env_cached("bg", key, 0, 0, W, H, g => {
+      env_frame(g, W, H); env_sacdraw(g, cx, cy, R, early);
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = .62; const e = env_sacLayer(W, H, cx, cy, R, early, "A"), s0 = g.canvas.width / W;
+      g.scale(s0, s0); env_sacBlit(g, e, cx, cy, R); g.restore();
+    }), 0, 0);
+  } else {
+    env_blit(c, env_cached("frame", W + "," + H, 0, 0, W, H, g => env_frame(g, W, H)), 0, 0);
+    env_sacBlit(c, env_sacLayer(W, H, cx, cy, R, early, ""), cx, cy, R);
+    c.globalAlpha = A0 * .62; env_sacBlit(c, env_sacLayer(W, H, cx, cy, R, early, "A"), cx, cy, R);
+  }
+  // 光束：另一组慢慢明暗起伏（低分辨率缓存）
+  const sh = .5 + .5 * Math.sin(t * .19);
+  c.globalAlpha = A0 * (.1 + .8 * sh); env_sacBlit(c, env_sacLayer(W, H, cx, cy, R, early, "B"), cx, cy, R);
+  // ---- 动态部分（都是贴图，开销很小） ----
+  const [lx, ly] = env_light(cx, cy, R), breath = .5 + .5 * Math.sin(t * TAU / 4.6);
+  // 妈妈呼吸时，透进来的光轻轻起伏
+  const gs = R * .8, dq = typeof DPR === "number" ? DPR : 1, gx = Math.floor((lx - gs) * dq) / dq, gy = Math.floor((ly - gs) * dq) / dq;
+  c.globalAlpha = A0 * (.13 + .07 * breath);
+  if (Math.abs(R - Math.min(W, H) * .44) < .01) {   // 孕囊大小固定时：按设备像素预先放大好，每帧 1:1 贴图（快）
+    env_blit(c, env_cached("glow", [gx, gy, gs].map(env_q).join(), gx, gy, gs * 2 + 2, gs * 2 + 2, g => g.drawImage(env_sprite("glow"), lx - gs, ly - gs, gs * 2, gs * 2)), gx, gy);
+  } else c.drawImage(env_sprite("glow"), lx - gs, ly - gs, gs * 2, gs * 2);
+  // 漂浮微粒：大而虚的光斑 + 细小的亮点，都缓慢漂移
+  const dot = env_sprite(), r = rng(early ? 31 : 37);
+  for (let i = 0; i < 11; i++) {
+    const a = r() * TAU + t * .012 * (r() - .5), rr = Math.sqrt(r()) * R * .86, s = R * (.05 + r() * .09);
+    const x = cx + Math.cos(a) * rr + Math.sin(t * .17 + i) * 5, y = cy + Math.sin(a) * rr + Math.cos(t * .13 + i * 2) * 5;
+    c.globalAlpha = A0 * (.06 + .05 * r()); c.drawImage(dot, x - s, y - s, s * 2, s * 2);
+  }
+  c.globalAlpha = A0;
+  c.fillStyle = "rgba(255,240,232,.32)"; c.beginPath();
+  for (let i = 0; i < 34; i++) {
+    const a = r() * TAU + t * .02 * (r() - .5), rr = Math.sqrt(r()) * R * .93, sz = .6 + r() * 1.5;
+    const x = cx + Math.cos(a) * rr + Math.sin(t * .4 + i) * 2.5, y = cy + Math.sin(a) * rr + Math.sin(t * .27 + i * 1.3) * 3.5;
+    circ(c, x, y, sz);
+  }
+  c.fill();
+}
+
+// ---------- 胎盘：贴在子宫壁上的一块柔软的分叶圆盘，胎儿面的血管从脐带根部分叉散开 ----------
 function drawPlacenta(c, cx, cy, R, a0, a1, th, t) {
-  c.save();
-  const pg = c.createRadialGradient(cx, cy, R - th, cx, cy, R);
-  pg.addColorStop(0, "#a12a40"); pg.addColorStop(1, "#5c1022");
-  c.beginPath(); c.arc(cx, cy, R * 1.004, a0, a1); c.arc(cx, cy, R - th, a1, a0, true); c.closePath();
-  c.fillStyle = pg; c.fill();
-  c.beginPath();
-  const n = Math.max(6, Math.round((a1 - a0) * 9));
-  for (let i = 0; i <= n; i++) { const a = lerp(a0 + .05, a1 - .05, i / n); circ(c, cx + Math.cos(a) * (R - th), cy + Math.sin(a) * (R - th), th * .32); }
-  c.fillStyle = "#94253b"; c.fill();
+  const am = (a0 + a1) / 2, tq = Math.max(1, Math.round(th / 1.5) * 1.5);   // 厚度按 1.5 px 一档缓存：慢慢变厚时不必频繁重画
+  // 外接框：内侧阴影到嵌进子宫壁的部分
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (let i = 0; i <= 16; i++) for (const rr of [R - tq * 1.45, R + tq * .6]) {
+    const a = lerp(a0, a1, i / 16), x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+  }
+  const dpr = typeof DPR === "number" ? DPR : 1;
+  x0 = Math.floor((x0 - 4) * dpr) / dpr; y0 = Math.floor((y0 - 4) * dpr) / dpr;
+  const key = [cx, cy, R, a0 * 100, a1 * 100].map(env_q).join(",") + "," + tq;
+  env_blit(c, env_cached("pl", key, x0, y0, x1 - x0 + 8, y1 - y0 + 8, g => env_placenta(g, cx, cy, R, a0, a1, tq)), x0, y0);
+  return { x: cx + Math.cos(am) * (R - th * 1.05), y: cy + Math.sin(am) * (R - th * 1.05), a: am };
+}
+function env_placenta(c, cx, cy, R, a0, a1, th) {
+  const n = 72, lobes = Math.max(4, Math.round((a1 - a0) * 4.2));
+  // 厚度：透镜形——中间最厚，往两端慢慢、柔和地变薄，顺着子宫壁收进去（不是一把两头尖的镰刀）
+  const prof = s => { const u = Math.max(0, 4 * s * (1 - s)); return Math.pow(u, .85) * (1 - .12 * Math.pow(Math.abs(2 * s - 1), 2)); };
+  const ang = s => lerp(a0, a1, s);
+  const rIn = s => R - th * prof(s);
+  const rOut = s => R + th * prof(s) * (.42 + .1 * Math.pow(Math.abs(Math.sin(s * lobes * Math.PI)), .5));
+  const P = (s, q) => { const a = ang(s), rr = lerp(rIn(s), rOut(s), q); return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]; };
   const am = (a0 + a1) / 2, ix = cx + Math.cos(am) * (R - th * 1.05), iy = cy + Math.sin(am) * (R - th * 1.05);
-  c.strokeStyle = "rgba(70,20,60,.55)"; c.lineWidth = Math.max(1, th * .07); c.lineCap = "round";
-  for (let k = -3; k <= 3; k++) {
-    if (!k) continue;
-    const a = am + k * (a1 - a0) / 8, rr = R - th * (.55 + .2 * Math.abs(Math.sin(k)));
-    c.beginPath(); c.moveTo(ix, iy); c.quadraticCurveTo(cx + Math.cos(am + k * .06) * (R - th * .8), cy + Math.sin(am + k * .06) * (R - th * .8), cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); c.stroke();
+  c.lineCap = "round"; c.lineJoin = "round";
+  const edge = q => { const p = new Path2D(); for (let i = 0; i <= n; i++) { const v = P(i / n, q); i ? p.lineTo(v[0], v[1]) : p.moveTo(v[0], v[1]); } return p; };
+  const body = new Path2D();
+  for (let i = 0; i <= n; i++) { const v = P(i / n, 0); i ? body.lineTo(v[0], v[1]) : body.moveTo(v[0], v[1]); }
+  for (let i = n; i >= 0; i--) { const v = P(i / n, 1); body.lineTo(v[0], v[1]); }
+  body.closePath();
+  // 投在羊水里的一圈柔影，让胎盘“长在”壁上
+  for (let k = 0; k < 14; k++) {
+    const s0 = k / 14, s1 = (k + 1) / 14, pm = prof((s0 + s1) / 2);
+    c.beginPath();
+    for (let j = 0; j <= 6; j++) { const v = P(lerp(s0, s1, j / 6), 0); j ? c.lineTo(v[0], v[1]) : c.moveTo(v[0], v[1]); }
+    c.lineWidth = th * .55 * pm + 1; c.strokeStyle = `rgba(110,36,60,${.1 * pm})`; c.stroke();
+  }
+  // 胎盘本体：靠羊水一侧浅、贴壁一侧深的柔和莓粉色
+  const pg = c.createRadialGradient(cx, cy, R - th, cx, cy, R + th * .55);
+  pg.addColorStop(0, "#d9828e"); pg.addColorStop(.45, "#c26a7c"); pg.addColorStop(1, "#99475f");
+  c.fillStyle = pg; c.fill(body);
+  c.save(); c.clip(body);
+  // 胎盘小叶：一个个软垫样的鼓包
+  const lc = [];
+  for (let k = 0; k < lobes; k++) {
+    const s = (k + .5) / lobes, pm = prof(s), p = P(s, .58), rr = th * pm * .7 + 1;
+    lc.push(s);
+    const lg = c.createRadialGradient(p[0], p[1], 0, p[0], p[1], rr * 1.2);
+    lg.addColorStop(0, "rgba(238,156,166,.45)"); lg.addColorStop(.6, "rgba(230,146,158,.14)"); lg.addColorStop(1, "rgba(230,146,158,0)");
+    c.fillStyle = lg; c.beginPath(); circ(c, p[0], p[1], rr * 1.2); c.fill();
+  }
+  // 小叶之间浅浅的分隔（从母体面伸进来）
+  c.lineWidth = Math.max(1, th * .05); c.strokeStyle = "rgba(128,46,74,.2)"; c.beginPath();
+  for (let k = 1; k < lobes; k++) { const s = k / lobes, p = P(s, 1.1), q = P(s + .004, .5); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }
+  c.stroke();
+  // 胎儿面（绒毛膜板）：一层带珠光的薄膜
+  c.lineWidth = th * .5; c.strokeStyle = "rgba(250,222,230,.2)"; c.stroke(edge(0));
+  c.lineWidth = th * .12; c.strokeStyle = "rgba(255,240,242,.38)"; c.stroke(edge(0));
+  // 血管：从脐带根部沿胎儿面向两边走，每到一个小叶就分出一支伸进去，再散成细枝（绒毛树）
+  const vr = rng(53), vw = Math.max(1.3, th * .085);
+  const poly = (pts, w0, w1, col) => {
+    for (let k = 1; k < pts.length; k++) {
+      const p = P(...pts[k - 1]), p1 = P(...pts[k]);
+      c.lineWidth = Math.max(.5, lerp(w0, w1, k / (pts.length - 1))); c.strokeStyle = col;
+      c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(p1[0], p1[1]); c.stroke();
+    }
+  };
+  for (const [qv, col, wm] of [[.07, "rgba(122,100,174,.55)", 1], [.14, "rgba(206,102,130,.6)", .75]]) {
+    for (const dir of [-1, 1]) {
+      const tr = [];
+      for (let k = 0; k <= 10; k++) tr.push([.5 + dir * k * .045, qv + .02 * Math.sin(k * 1.7 + dir)]);
+      poly(tr, vw * wm, vw * wm * .35, col);
+    }
+    for (const s of lc) {
+      if (Math.abs(s - .5) < .04) continue;
+      const sj = s + (vr() - .5) * .03, mid = [sj + (vr() - .5) * .02, .5], pts = [[s + (s < .5 ? .03 : -.03), qv], [lerp(s, sj, .5), .28], mid];
+      poly(pts, vw * wm * .5, vw * wm * .3, col);
+      for (let j = -1; j <= 1; j++) poly([mid, [mid[0] + j * .025 + (vr() - .5) * .01, .66], [mid[0] + j * .04 + (vr() - .5) * .015, .82]], vw * wm * .28, vw * wm * .16, col);
+    }
   }
   c.restore();
-  return { x: ix, y: iy, a: am };
+  // 胎盘外缘的一道柔光
+  c.lineWidth = Math.max(1, th * .05); c.strokeStyle = "rgba(255,226,230,.16)"; c.stroke(body);
+  // 脐带根部：与脐带同色的小鼓包
+  c.fillStyle = "rgba(226,184,198,.55)"; c.beginPath(); c.ellipse(ix + Math.cos(am) * th * .12, iy + Math.sin(am) * th * .12, th * .2, th * .3, am, 0, TAU); c.fill();
 }
 
+// ---------- 脐带：半透明的胶质里，两条动脉绕着一条静脉盘旋 ----------
 function drawCord(c, x0, y0, x1, y1, w, t, bend) {
-  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, dx = x1 - x0, dy = y1 - y0;
-  const c1x = mx - dy * bend + Math.sin(t * .5) * w, c1y = my + dx * bend;
-  c.save(); c.lineCap = "round";
-  c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(c1x, c1y, x1, y1);
-  c.lineWidth = w; c.strokeStyle = "#c79aa8"; c.stroke();
-  c.setLineDash([w * .9, w * .7]); c.lineDashOffset = -t * 2;
-  c.lineWidth = w * .45; c.strokeStyle = "rgba(120,50,90,.55)"; c.stroke();
-  c.setLineDash([]); c.lineWidth = w * .18; c.strokeStyle = "rgba(255,235,240,.35)"; c.stroke();
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, dx = x1 - x0, dy = y1 - y0, D = Math.hypot(dx, dy);
+  const qx = mx - dy * bend + Math.sin(t * .5) * w, qy = my + dx * bend;
+  const n = clamp(Math.round(D * (1 + Math.abs(bend)) / 3), 20, 120);
+  const pts = [], nrm = [];
+  // 二次曲线上叠一点慢慢飘动的波浪，两端固定不动
+  const wav = Math.min(D * .05, w * 2.2), ph = t * .3;
+  for (let i = 0; i <= n; i++) {
+    const s = i / n, u = 1 - s;
+    const bx = u * u * x0 + 2 * u * s * qx + s * s * x1, by = u * u * y0 + 2 * u * s * qy + s * s * y1;
+    let tx = 2 * u * (qx - x0) + 2 * s * (x1 - qx), ty = 2 * u * (qy - y0) + 2 * s * (y1 - qy);
+    const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
+    const off = Math.sin(s * TAU * 1.1 + ph + 1) * Math.pow(Math.sin(Math.PI * s), 1.5) * wav;
+    pts.push([bx - ty * off, by + tx * off]);
+  }
+  for (let i = 0; i <= n; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n, i + 1)];
+    const tx = b[0] - a[0], ty = b[1] - a[1], m = Math.hypot(tx, ty) || 1;
+    nrm.push([-ty / m, tx / m]);
+  }
+  const offPath = k => { const p = new Path2D(); pts.forEach((v, i) => { const x = v[0] + nrm[i][0] * k, y = v[1] + nrm[i][1] * k; i ? p.lineTo(x, y) : p.moveTo(x, y); }); return p; };
+  const line = offPath(0);
+  c.save(); c.lineCap = "round"; c.lineJoin = "round";
+  // 胶质（华通胶）：半透明的乳白色，边缘略深
+  c.lineWidth = w * 1.12; c.strokeStyle = "rgba(170,96,120,.28)"; c.stroke(line);
+  c.lineWidth = w; c.strokeStyle = "rgba(236,200,208,.62)"; c.stroke(line);
+  // 螺旋：沿弧长计相位，两条动脉相差半圈
+  let acc = 0; const phs = [0];
+  for (let i = 1; i <= n; i++) { acc += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); phs.push(acc / (w * 4.2) * TAU); }
+  const amp = w * .25;
+  const strand = front => {
+    const p = new Path2D();
+    for (let k = 0; k < 2; k++) {
+      let on = false;
+      for (let i = 0; i <= n; i++) {
+        const f = phs[i] + k * Math.PI, isF = Math.cos(f) > -.05;
+        const x = pts[i][0] + nrm[i][0] * Math.sin(f) * amp, y = pts[i][1] + nrm[i][1] * Math.sin(f) * amp;
+        if (isF === front || (front && Math.abs(Math.cos(f)) < .15)) { on ? p.lineTo(x, y) : p.moveTo(x, y); on = true; } else on = false;
+      }
+    }
+    return p;
+  };
+  // 后半圈的动脉：隔着胶质，颜色很淡
+  c.lineWidth = w * .18; c.strokeStyle = "rgba(196,110,138,.3)";
+  c.stroke(strand(false));
+  // 静脉：居中，淡淡的蓝紫色
+  c.lineWidth = w * .3; c.strokeStyle = "rgba(140,120,190,.5)"; c.stroke(line);
+  // 前半圈的动脉
+  c.lineWidth = w * .21; c.strokeStyle = "rgba(208,106,134,.75)";
+  c.stroke(strand(true));
+  // 胶质表面的一层柔光和高光（朝向光源一侧）
+  c.lineWidth = w * .82; c.strokeStyle = "rgba(250,228,232,.2)"; c.stroke(line);
+  const nm = nrm[n >> 1], hs = (nm[0] + nm[1] < 0 ? 1 : -1) * w * .27;
+  c.lineWidth = Math.max(.8, w * .11); c.strokeStyle = "rgba(255,246,246,.42)"; c.stroke(offPath(hs));
   c.restore();
 }
 
+// ---------- 着床与胚胎期（本文件私有的名字一律以 em_ 开头） ----------
+// 胚胎用一套随天数连续变化的参数模型：躯干脊柱 + 脑管（头）+ 腹侧隆起 + 肢体。
+// 着床后期（孕囊、胚盘）和胚胎期共用同一个布局，两个场景交叉淡化时完全重合。
+
+const em_cv = document.createElement("canvas"), em_g = em_cv.getContext("2d");
+function em_layer(W, H) {
+  const w = Math.round(W * DPR), h = Math.round(H * DPR), L = em_g;
+  if (em_cv.width !== w || em_cv.height !== h) { em_cv.width = w; em_cv.height = h; }
+  L.setTransform(1, 0, 0, 1, 0, 0); L.globalCompositeOperation = "source-over"; L.globalAlpha = 1; L.filter = "none";
+  L.clearRect(0, 0, w, h); L.setTransform(DPR * em_Q, 0, 0, DPR * em_Q, 0, 0);
+  return L;
+}
+// 关键帧插值（三次 Hermite，两端斜率为 0，没有折角）
+function em_tab(T, d) {
+  const n = T.length;
+  if (d <= T[0][0]) return T[0][1];
+  if (d >= T[n - 1][0]) return T[n - 1][1];
+  let i = 1; while (d > T[i][0]) i++;
+  const x0 = T[i - 1][0], y0 = T[i - 1][1], x1 = T[i][0], y1 = T[i][1], h = x1 - x0, u = (d - x0) / h;
+  const sl = k => k <= 0 || k >= n - 1 ? 0 : (T[k + 1][1] - T[k - 1][1]) / (T[k + 1][0] - T[k - 1][0]);
+  const m0 = sl(i - 1) * h, m1 = sl(i) * h, u2 = u * u, u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * y0 + (u3 - 2 * u2 + u) * m0 + (-2 * u3 + 3 * u2) * y1 + (u3 - u2) * m1;
+}
+const em_add = (p, a, r) => [p[0] + Math.cos(a) * r, p[1] + Math.sin(a) * r];
+const em_l2 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+
+// ---- 胚胎几何（局部单位；脸朝左、头在上、y 向下）----
+function em_model(d) {
+  const fold = smooth(30.5, 40.5, d), late = smooth(46, 58, d), tailK = 1 - smooth(38, 50, d);
+  const thick = smooth(29.5, 38, d);
+  const Lb = 1.1, Lt = .36 * fold * tailK;
+  const kb = em_tab([[31, .12], [34, .45], [37, 1.5], [40, 2.5], [44, 2.7], [48, 2.55], [52, 2.35], [56, 2.15], [60, 2.05]], d);
+  const kt = lerp(.8, 5, fold);
+  const ph0 = em_tab([[31, 1.62], [36, 1.25], [40, .8], [44, .72], [50, .58], [56, .45], [60, .4]], d);
+  const wB = s => lerp(.034 + .07 * Math.sin(Math.PI * (.06 + .88 * clamp(s, 0, 1))), .118 + .03 * Math.exp(-(((s - .3) / .28) ** 2)) - .022 * smooth(.72, 1, s), thick);
+  const sp = [];
+  let x = 0, y = 0, ph = ph0;
+  const n = 44, ds = Lb / n;
+  for (let i = 0; i <= n; i++) {
+    sp.push([x, y, ph, wB(i / n), i / n]);
+    if (i < n) { const pm = ph + kb * ds / 2; x += Math.cos(pm) * ds; y += Math.sin(pm) * ds; ph += kb * ds; }
+  }
+  if (Lt > .004) {
+    const nt = 22, dt = Lt / nt, w0 = wB(1);
+    for (let i = 1; i <= nt; i++) {
+      const q = i / nt, k = kt * (.4 + .9 * q);
+      const pm = ph + k * dt / 2; x += Math.cos(pm) * dt; y += Math.sin(pm) * dt; ph += k * dt;
+      sp.push([x, y, ph, lerp(w0, .032, Math.pow(q, 1.1)), 1 + q]);
+    }
+  }
+  const at = s => {
+    const f = clamp(s, 0, 1) * n, i = Math.min(n - 1, Math.floor(f)), u = f - i, a = sp[i], b = sp[i + 1];
+    return [lerp(a[0], b[0], u), lerp(a[1], b[1], u), lerp(a[2], b[2], u), lerp(a[3], b[3], u)];
+  };
+  // v>0 偏向腹侧，tg 沿脊柱方向
+  const off = (s, v, tg) => { const p = at(s), a = p[2] + Math.PI / 2; return [p[0] + Math.cos(a) * v + Math.cos(p[2]) * (tg || 0), p[1] + Math.sin(a) * v + Math.sin(p[2]) * (tg || 0), p[2], p[3]]; };
+
+  // 躯干：沿脊柱的一串圆（按半径加密，轮廓才光滑）
+  const body = [];
+  const tube = (pts, out) => {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1], dd = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const m = Math.max(1, Math.ceil(dd / (.28 * Math.min(a[2], b[2]))));
+      for (let k = 0; k < m; k++) { const q = k / m; out.push([lerp(a[0], b[0], q), lerp(a[1], b[1], q), lerp(a[2], b[2], q)]); }
+    }
+    const e = pts[pts.length - 1]; out.push([e[0], e[1], e[2]]);
+  };
+  tube(sp.map(p => [p[0], p[1], p[3]]), body);
+
+  // 头：从颈部向前弯的一段“脑管”，后脑 → 中脑（头顶）→ 前脑（脸）
+  const hR = em_tab([[30.5, .045], [33, .09], [36, .165], [38, .19], [40, .21], [44, .24], [48, .27], [52, .295], [56, .315], [60, .325]], d);
+  const Lc = em_tab([[31, .08], [36, .2], [40, .26], [44, .28], [50, .25], [56, .2], [60, .18]], d);
+  const kc = em_tab([[31, 0], [35, 1.2], [39, 4], [44, 4.4], [50, 3.6], [56, 2.6], [60, 2.3]], d);
+  const w0 = wB(0), cran = [];
+  let hx = 0, hy = 0, th = ph0 + Math.PI;
+  const mC = 14, dc = Lc / mC;
+  for (let j = 0; j <= mC; j++) {
+    const q = j / mC;
+    const r = w0 + (hR - w0) * smooth(0, .55, q) * (1 - lerp(.16, .06, late) * smooth(.75, 1, q));
+    cran.push([hx, hy, r, th]);
+    if (j < mC) { const tm = th - kc * dc / 2; hx += Math.cos(tm) * dc; hy += Math.sin(tm) * dc; th -= kc * dc; }
+  }
+  const head = [];
+  tube(cran, head);
+  const hcI = Math.round(mC * .62), hc = [cran[hcI][0], cran[hcI][1]];
+  const F = cran[mC], thE = F[3];
+  const face = thE - lerp(.45, .12, late);
+  // 后期头颅更圆：在头顶后方补一个大圆
+  if (late > 0) { const cr = em_add(hc, face + Math.PI * .62, hR * .16 * late); head.push([cr[0], cr[1], hR * (.9 + .08 * late)]); }
+
+  // 腹侧隆起：心、肝、颌
+  const hk = smooth(34.5, 41, d) * (1 - .55 * late), lk = smooth(39, 46, d) * (1 - .5 * late);
+  const hp = off(.15, wB(.15) * .5 + .075 * hk);
+  const heart = [hp[0], hp[1], .03 + .135 * hk, .03 + .12 * hk, hp[2]];
+  const lp = off(.4, wB(.4) * .45 + .04 * lk);
+  const liver = [lp[0], lp[1], .02 + .12 * lk, .02 + .095 * lk, lp[2]];
+  const mouth = em_add(hc, face - .32, hR * .9);
+  const jw = em_l2(mouth, [heart[0], heart[1]], .45);
+  const jaw = [jw[0], jw[1], .02 + .075 * fold, .02 + .065 * fold, face];
+  const bulges = [heart, liver, jaw];
+
+  // 肢体：肢芽 → 桨状 → 手板/足板 → 指（趾）
+  const limbs = [];
+  const limb = (s, g, a0, bend, len, wid, hand, isLeg) => {
+    if (g <= 0) return;
+    const base = off(s, wB(s) * .15), dir0 = base[2] + a0;
+    const Ln = len * (isLeg ? .3 + .7 * g * g : .22 + .78 * g * g);
+    const p0 = [base[0], base[1]], p1 = em_add(p0, dir0, Ln * .5), p2 = em_add(p1, dir0 + bend, Ln * .5);
+    const wa = wid * lerp(1.2, .8, smooth(.15, .7, g)), wb2 = wid * lerp(1.05, .8, g), wc = wid * lerp(.95, .72, g);
+    const pts = [];
+    tube([[p0[0], p0[1], wa], [p1[0], p1[1], wb2], [p2[0], p2[1], wc]], pts);
+    const pk = smooth(.1, .42, g), hs = hand * pk * (isLeg ? 1 : 1.12);
+    const hcn = em_add(p2, dir0 + bend, hs * .5);
+    limbs.push({ pts, p0, p1, p2, dir: dir0 + bend, hc: hcn, hs, pk, dg: smooth(.58, .8, g), sep: smooth(.78, 1, g), isLeg, g });
+  };
+  const gU = smooth(38.5, 57, d), gL = smooth(41.5, 59.5, d);
+  limb(.24, gU, lerp(.95, .75, gU), 1.6 * smooth(.5, 1, gU), .36, .058, .085, false);
+  limb(.86, gL, lerp(.3, 1.3, gL * gL), -2.2 * smooth(.6, 1, gL), .22, .078, .092, true);
+
+  // 包围盒与头臀长（头顶到臀部的最大直线距离）
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  const box = (x, y, r) => { x0 = Math.min(x0, x - r); y0 = Math.min(y0, y - r); x1 = Math.max(x1, x + r); y1 = Math.max(y1, y + r); };
+  for (const b of body) box(b[0], b[1], b[2]);
+  for (const h of head) box(h[0], h[1], h[2]);
+  for (const b of bulges) box(b[0], b[1], Math.max(b[2], b[3]));
+  for (const lb of limbs) { for (const q of lb.pts) box(q[0], q[1], q[2]); box(lb.hc[0], lb.hc[1], lb.hs); }
+  let crl = 0;
+  for (const h of head) for (let i = Math.round(n * .5); i <= n; i++) { const p = sp[i]; crl = Math.max(crl, Math.hypot(p[0] - h[0], p[1] - h[1]) + h[2] + p[3]); }
+  const navel = em_l2(off(1, wB(1) * .4), off(.62, wB(.62) * .85), fold), navA = lerp(at(1)[2], at(.62)[2], fold) + Math.PI / 2;
+  const ysAt = off(.48, wB(.48));
+  return { d, fold, late, thick, sp, n, at, off, body, head, bulges, limbs, hc, hR, face, mouth, heart, liver, navel, navA, ysAt,
+    box: [x0, y0, x1, y1], crl, wB, Lt };
+}
+
+// 一组圆/椭圆的并集路径（全部顺时针，nonzero 填充即为并集）
+function em_path(L, prims, inset) {
+  L.beginPath();
+  for (const p of prims) {
+    if (p.length === 3) { const r = p[2] - inset; if (r > 0) circ(L, p[0], p[1], r); }
+    else { const a = p[2] - inset, b = p[3] - inset; if (a > 0 && b > 0) { L.moveTo(p[0] + Math.cos(p[4]) * a, p[1] + Math.sin(p[4]) * a); L.ellipse(p[0], p[1], a, b, p[4], 0, TAU); } }
+  }
+}
+// 半透明的皮肤：一层层往里收的同形状，外缘最透、偏粉，越往里越实、越暖白（不用模糊滤镜，省性能）
+const em_SH = [[0, [232, 140, 150], .5], [1.5, [244, 184, 179], .88], [4.2, [248, 202, 192], .7], [9, [252, 216, 205], .62]];
+function em_skin(L, prims, px, sc) {
+  for (const sh of em_SH) { em_path(L, prims, sh[0] * px * sc); L.fillStyle = rgb(sh[1], sh[2]); L.fill(); }
+}
+
+// 画胚胎：M 模型，(X,Y) 为画面位置（对应模型包围盒中心），k 像素/单位，rot 旋转
+// 胚胎图层按（天数、尺寸、位置）缓存；轻微漂动和心跳在合成时再加，拖动以外的帧几乎不花时间
+// 胚胎图层缓存：天数在变（拖动、播放）时用约 0.6 倍分辨率画（胚胎本来就是柔和的，看不出差别、但快很多），
+// 停下来约 0.15 秒后再按全分辨率重画一次
+let em_key = "", em_Q = 1, em_dSeen = -1, em_dT = 0;
+const em_bb = [0, 0, 0, 0];
+function em_drawEmbryo(c, W, H, M, X, Y, bob, k, rot, t, alpha) {
+  const now = performance.now();
+  if (M.d !== em_dSeen) { em_dSeen = M.d; em_dT = now; }
+  const q = now - em_dT < 150 ? .6 : 1;
+  const key = [M.d, W, H, DPR, q, k.toFixed(3), X.toFixed(2), Y.toFixed(2)].join();
+  if (key !== em_key) { em_key = key; em_Q = q; em_render(W, H, M, X, Y, k); }
+  const bx = (M.box[0] + M.box[2]) / 2, by = (M.box[1] + M.box[3]) / 2;
+  c.save(); c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.translate(X, Y + bob); c.rotate(rot); c.translate(-X, -Y);
+  c.globalAlpha = alpha;
+  const x0 = em_bb[0], y0 = em_bb[1], w = em_bb[2] - x0, h = em_bb[3] - y0;
+  const sq = DPR * em_Q;
+  if (w > 0 && h > 0) c.drawImage(em_cv, x0 * sq, y0 * sq, w * sq, h * sq, x0, y0, w, h);
+  // 心跳：心脏隆起处一下一下柔和地变亮
+  const bpm = heartRate(M.d), hk = smooth(34.5, 40, M.d) * (1 - .5 * M.late);
+  if (bpm && hk > 0) {
+    const beat = pulse(t, bpm), hh = M.heart, hx = X + (hh[0] - bx) * k, hy = Y + (hh[1] - by) * k, hr = Math.min(hh[2], hh[3]) * k * .95;
+    const g = c.createRadialGradient(hx, hy, 0, hx, hy, hr);
+    g.addColorStop(0, `rgba(236,112,128,${.3 * beat * hk})`); g.addColorStop(1, "rgba(236,112,128,0)");
+    c.fillStyle = g; c.beginPath(); circ(c, hx, hy, hr); c.fill();
+  }
+  c.restore();
+}
+function em_render(W, H, M, X, Y, k) {
+  const d = M.d, L = em_layer(W, H);
+  const bx = (M.box[0] + M.box[2]) / 2, by = (M.box[1] + M.box[3]) / 2;
+  em_bb[0] = Math.max(0, Math.floor(X + (M.box[0] - bx) * k - 8)); em_bb[1] = Math.max(0, Math.floor(Y + (M.box[1] - by) * k - 8));
+  em_bb[2] = Math.min(W, Math.ceil(X + (M.box[2] - bx) * k + 8)); em_bb[3] = Math.min(H, Math.ceil(Y + (M.box[3] - by) * k + 8));
+  L.save();
+  L.translate(X, Y); L.scale(k, k); L.translate(-bx, -by);
+  const px = 1 / k, all = M.body.concat(M.head, M.bulges), sc = clamp(k / 150, .55, 1.5);
+  em_skin(L, all, px, sc);
+  L.globalCompositeOperation = "source-atop";
+  // 胚盘期：腹侧一层（下胚层）带一点卵黄色，看得出是“两层”的盘
+  if (M.fold < 1) {
+    const P = M.at(.5), v = P[2] + Math.PI / 2, w = M.wB(.5);
+    const g = L.createLinearGradient(P[0] - Math.cos(v) * w, P[1] - Math.sin(v) * w, P[0] + Math.cos(v) * w, P[1] + Math.sin(v) * w);
+    const a = .7 * (1 - M.fold);
+    g.addColorStop(0, "rgba(255,236,230,0)"); g.addColorStop(.44, `rgba(255,236,230,${a * .3})`); g.addColorStop(.56, `rgba(246,212,150,${a})`); g.addColorStop(1, `rgba(240,200,140,${a})`);
+    L.fillStyle = g; L.fillRect(M.box[0] - 1, M.box[1] - 1, M.box[2] - M.box[0] + 2, M.box[3] - M.box[1] + 2);
+  }
+  L.globalCompositeOperation = "source-over";
+
+  L.globalCompositeOperation = "source-atop";
+  // 透出来的心脏（随心跳轻轻变亮）与肝脏
+  const hk = smooth(34.5, 40, d);
+  if (hk > 0) {
+    const h = M.heart, hr = Math.max(h[2], h[3]) * 1.04;
+    const g = L.createRadialGradient(h[0], h[1], 0, h[0], h[1], hr);
+    g.addColorStop(0, `rgba(228,108,122,${.3 * hk * (1 - .45 * M.late)})`); g.addColorStop(.6, `rgba(228,116,128,${.13 * hk})`); g.addColorStop(1, "rgba(228,116,128,0)");
+    L.fillStyle = g; L.beginPath(); circ(L, h[0], h[1], hr); L.fill();
+    const lv = M.liver, lr = Math.max(lv[2], lv[3]);
+    const g2 = L.createRadialGradient(lv[0], lv[1], 0, lv[0], lv[1], lr);
+    g2.addColorStop(0, `rgba(192,98,112,${.2 * hk})`); g2.addColorStop(1, "rgba(192,98,112,0)");
+    L.fillStyle = g2; L.beginPath(); circ(L, lv[0], lv[1], lr); L.fill();
+  }
+  // 脑泡：头里透亮的区域
+  if (M.fold > .2) {
+    const a = M.fold, hc = M.hc, hR = M.hR;
+    const g = L.createRadialGradient(hc[0], hc[1] - hR * .15, 0, hc[0], hc[1], hR * .95);
+    g.addColorStop(0, `rgba(255,246,240,${.38 * a})`); g.addColorStop(1, "rgba(255,246,240,0)");
+    L.fillStyle = g; L.beginPath(); circ(L, hc[0], hc[1], hR); L.fill();
+  }
+  // 体节：背侧一串柔和的小珠
+  const so = smooth(33.5, 36, d) * (1 - smooth(43, 48, d));
+  if (so > 0) {
+    const sMax = lerp(.12, 1.25, smooth(33.5, 42, d));
+    for (let s = .03; s < Math.min(sMax, 1.12); s += .042) {
+      const p = s <= 1 ? M.off(s, -M.wB(s) * .56) : M.off(1, -M.wB(1) * .5, (s - 1) * 1.1);
+      const ww = M.wB(Math.min(s, 1)) * (s > 1 ? .7 : 1);
+      L.save(); L.translate(p[0], p[1]); L.rotate(p[2]);
+      L.beginPath(); L.ellipse(0, 0, .016, ww * .26, 0, 0, TAU); L.fillStyle = `rgba(255,242,236,${.34 * so})`; L.fill();
+      L.restore();
+    }
+  }
+  // 鳃弓：脸和心之间几道柔和的横褶
+  const ar = smooth(36, 39, d) * (1 - smooth(47, 52, d));
+  if (ar > 0) {
+    const m = M.mouth, ht = [M.heart[0], M.heart[1]], ear = em_add(M.hc, M.face - 2.05, M.hR * .7);
+    L.lineCap = "round";
+    for (let i = 0; i < 4; i++) {
+      const vis = ar * smooth(36 + i * 1.4, 37.5 + i * 1.4, d);
+      if (vis <= 0) continue;
+      const q = .18 + i * .2, a = em_l2(em_l2(m, ht, q), ear, .08), b = em_l2(em_l2(m, ht, q * .6), ear, .6 - i * .07);
+      const nx = -(b[1] - a[1]), ny = b[0] - a[0], nl = Math.hypot(nx, ny) || 1;
+      L.beginPath(); L.moveTo(a[0], a[1]); L.quadraticCurveTo((a[0] + b[0]) / 2 + nx / nl * .02, (a[1] + b[1]) / 2 + ny / nl * .02, b[0], b[1]);
+      L.strokeStyle = `rgba(200,110,122,${.3 * vis})`; L.lineWidth = 1.6 * px + .006; L.stroke();
+      L.save(); L.translate(nx / nl * .013, ny / nl * .013); L.strokeStyle = `rgba(255,238,230,${.38 * vis})`; L.lineWidth = 2 * px + .008; L.stroke(); L.restore();
+    }
+  }
+  // 眼：浅浅的晶状体板 → 一片很淡、边缘柔和的玫瑰褐色素（没有高光、没有深色边，不像“瞳孔”）→ 眼睑褶慢慢盖上
+  const eo = smooth(39, 44, d);
+  if (eo > 0) {
+    const E = em_add(M.hc, M.face + lerp(.5, -.5, M.late), M.hR * lerp(.52, .6, M.late)), er = M.hR * .19;
+    const pig = smooth(45, 51, d), lid = smooth(49.5, 56, d);
+    L.save(); L.translate(E[0], E[1]); L.rotate(M.face + Math.PI);
+    L.beginPath(); L.ellipse(0, 0, er, er * (1 - .45 * lid), 0, 0, TAU);
+    L.fillStyle = `rgba(214,140,150,${.22 * eo * (1 - .5 * lid)})`; L.fill();
+    if (pig > 0) {
+      const pa = pig * (1 - .55 * lid), pg = L.createRadialGradient(-er * .1, er * .05, 0, 0, 0, er);
+      pg.addColorStop(0, `rgba(176,112,110,${.24 * pa})`); pg.addColorStop(.55, `rgba(180,118,116,${.16 * pa})`); pg.addColorStop(1, "rgba(186,124,122,0)");
+      L.save(); L.scale(1, .78 * (1 - .5 * lid)); L.beginPath(); circ(L, 0, 0, er); L.fillStyle = pg; L.fill(); L.restore();
+    }
+    if (lid > 0) {   // 上眼睑：一片和皮肤同色的软褶从上往下盖，边缘是一条很淡的弧线
+      L.beginPath(); L.moveTo(-er * 1.15, -er * .1); L.quadraticCurveTo(0, -er * (1.1 - 1.5 * lid), er * 1.15, -er * .1); L.quadraticCurveTo(0, -er * 1.3, -er * 1.15, -er * .1);
+      L.fillStyle = `rgba(248,206,198,${.55 * lid})`; L.fill();
+      L.beginPath(); L.moveTo(-er * 1.05, -er * .08); L.quadraticCurveTo(0, er * (.42 * lid - .3 * (1 - lid)), er * 1.05, -er * .08);
+      L.strokeStyle = `rgba(166,98,110,${.42 * lid})`; L.lineWidth = 1.3 * px; L.lineCap = "round"; L.stroke();
+    }
+    L.restore();
+  }
+  // 耳：先是小凹，后是耳廓
+  const eaO = smooth(40, 45, d);
+  if (eaO > 0) {
+    const ad = M.face - 2.05, ea = em_add(M.hc, ad, M.hR * .68), r = M.hR * lerp(.08, .15, smooth(46, 56, d));
+    L.beginPath(); L.arc(ea[0], ea[1], r, M.face - .2, M.face + 2.6);
+    L.strokeStyle = `rgba(192,106,118,${.42 * eaO})`; L.lineWidth = 1.4 * px + .004; L.lineCap = "round"; L.stroke();
+  }
+  // 嘴、鼻
+  const mo = smooth(41, 47, d);
+  if (mo > 0) {
+    const m = M.mouth;
+    // 嘴：一条很平的细线，略微上扬（不画成向下的弧，避免“愁眉苦脸”）
+    const mc = em_add(m, M.face + Math.PI / 2, M.hR * .32);
+    L.beginPath(); L.arc(mc[0], mc[1], M.hR * .32, M.face - Math.PI / 2 - .1, M.face - Math.PI / 2 + .34);
+    L.strokeStyle = `rgba(186,100,112,${.34 * mo})`; L.lineWidth = 1.3 * px; L.lineCap = "round"; L.stroke();
+    const no = smooth(47, 53, d);
+    if (no > 0) {
+      const ns = em_add(M.hc, M.face + .08, M.hR * .84);
+      L.beginPath(); L.arc(ns[0], ns[1], M.hR * .06, M.face - 1.1, M.face + 1.1);
+      L.strokeStyle = `rgba(190,104,116,${.26 * no})`; L.lineWidth = 1.1 * px; L.stroke();
+    }
+  }
+  // 光影：左上来光
+  const hc = M.hc;
+  const lg = L.createRadialGradient(hc[0] - M.hR * .5, hc[1] - M.hR * .6, M.hR * .05, hc[0] + M.hR * .6, hc[1] + M.hR * .8, M.crl * 1.2);
+  lg.addColorStop(0, "rgba(255,250,244,.42)"); lg.addColorStop(.35, "rgba(255,240,236,0)"); lg.addColorStop(1, "rgba(140,50,70,.3)");
+  L.fillStyle = lg; L.fillRect(M.box[0] - 1, M.box[1] - 1, M.box[2] - M.box[0] + 2, M.box[3] - M.box[1] + 2);
+  L.globalCompositeOperation = "source-over";
+
+  // 近侧的手和脚（底下一层很淡的投影，好从身体上分出来）；与胎儿期交接时先淡出，免得和胎儿的手脚重影
+  const ef = 1 - smooth(55, 57.5, d);
+  L.globalAlpha = ef;
+  for (const lb of ef > .01 ? M.limbs : []) {
+    const prim = lb.pts.slice();
+    if (lb.hs > 0) prim.push([lb.hc[0], lb.hc[1], lb.hs, lb.hs * lerp(.8, .62, lb.pk), lb.dir]);
+    L.save(); L.globalCompositeOperation = "source-atop";
+    L.translate(1.5 * px, 2 * px); em_path(L, prim, -1.5 * px); L.fillStyle = "rgba(176,86,102,.14)"; L.fill();
+    em_path(L, prim, 0); L.fillStyle = "rgba(176,86,102,.18)"; L.fill(); L.restore();
+    em_skin(L, prim, px, sc * .6);
+    if (lb.dg > 0) {
+      L.save(); L.translate(lb.hc[0], lb.hc[1]); L.rotate(lb.dir);
+      L.strokeStyle = `rgba(206,120,132,${.38 * lb.dg})`; L.lineWidth = 1 * px; L.lineCap = "round";
+      for (let i = -1.5; i <= 1.5; i++) { const a = i * .32; L.beginPath(); L.moveTo(Math.cos(a) * lb.hs * .2, Math.sin(a) * lb.hs * .2); L.lineTo(Math.cos(a) * lb.hs * .9, Math.sin(a) * lb.hs * .7); L.stroke(); }
+      L.restore();
+    }
+  }
+  L.globalAlpha = 1;
+  L.restore();
+}
+
+// ---- 孕囊里的布局（以孕囊半径为单位，原点在孕囊中心）----
+const em_PLA = [1.95, 3.35];             // 胎盘（叶状绒毛膜）的角度范围，与胎儿期完全一致
+function em_size(d) { return em_tab([[24, .58], [27, .52], [29.5, .48], [33, .45], [36, .45], [40, .52], [44, .62], [48, .73], [52, .83], [56, .92], [60, .97]], d); }
+// 早期整个胚胎复合体（胚盘、羊膜、卵黄囊）靠在胎盘一侧的囊壁旁，由一段短粗的体蒂连着；之后慢慢漂向中央
+function em_centre(d) { return [em_tab([[24, -.38], [28, -.42], [33, -.38], [38, -.2], [44, -.07], [48, -.04], [56, -.08], [60, -.08]], d), em_tab([[24, .3], [28, .3], [33, .24], [38, .1], [44, .01], [56, .02]], d)]; }
+let em_MC = null;
+function em_modelC(d) { if (!em_MC || em_MC.d !== d) em_MC = em_model(d); return em_MC; }
+// 孕囊内各结构的位置（胚胎场景、着床场景，以及胎儿期开头交接时都用这一份）
+function em_frame(sx, sy, R, d, t) {
+  const M = em_modelC(d), G = em_size(d) * R, k = G / M.crl, oc = em_centre(d);
+  const sway = Math.sin(t * .35) * .035 * (1 - smooth(48, 56, d));
+  const bob = Math.sin(t * .5) * R * .006, X = sx + oc[0] * R, Y0 = sy + oc[1] * R, Y = Y0 + bob;
+  const bx = (M.box[0] + M.box[2]) / 2, by = (M.box[1] + M.box[3]) / 2;
+  const toW = p => { const v = rot2([(p[0] - bx) * k, (p[1] - by) * k], sway); return [X + v[0], Y + v[1]]; };
+  const nav = toW(M.navel), navA = M.navA + sway;
+  const yAt = toW(M.ysAt), yDir = M.ysAt[2] + Math.PI / 2 + sway;
+  // 卵黄囊：先贴在胚胎腹侧，后来被细蒂牵着漂到孕囊下方
+  const ysR = R * em_tab([[24, .28], [26.5, .19], [29, .11], [33, .105], [40, .1], [48, .09], [56, .075], [70, .06], [84, .05]], d);
+  const att = em_add(yAt, yDir, ysR * .92 + R * .3 * smooth(34, 39.5, d));
+  const fin = [sx - R * .34, sy + R * .68];
+  const yq = smooth(36, 45, d), ys = em_l2(att, fin, yq);
+  ys[0] -= R * .15 * Math.sin(Math.PI * yq);
+  // 羊膜腔：先是胚盘背侧的小腔，再把胚胎整个包住、越长越大
+  const dorsal = em_add([X, Y], yDir + Math.PI, G * .2 * (1 - M.fold));
+  const amR0 = G * lerp(.42, .7, M.fold), amR = Math.max(amR0, R * em_tab([[34, .1], [38, .26], [44, .5], [50, .66], [56, .84], [60, .9]], d));
+  const amC = em_l2(dorsal, [sx + (X - sx) * .4, sy + (Y - sy) * .4], smooth(42, 58, d));
+  const amCl = Math.min(amR, R * .97 - Math.hypot(amC[0] - sx, amC[1] - sy));
+  // 体蒂 / 脐带在胎盘上的附着点：起初就在胚胎尾端最近的囊壁上，之后移到胎盘正中（与胎儿期脐带的插入点一致）
+  const th = R * lerp(.05, .09, smooth(29, 56, d));
+  let na = Math.atan2(nav[1] - sy, nav[0] - sx); if (na < 0) na += TAU;
+  const am = (em_PLA[0] + em_PLA[1]) / 2, wa = lerp(clamp(na, em_PLA[0] + .25, em_PLA[1] - .25), am, smooth(33, 46, d));
+  const ins = [sx + Math.cos(wa) * (R - th * .6), sy + Math.sin(wa) * (R - th * .6)];
+  return { M, G, k, X, Y0, Y, bob, sway, bx, by, toW, nav, navA, yAt, yDir, ys, ysR, amC, amCl, th, wa, ins, sx, sy, R, mm: seriesAt(CRL, d, true) * 10 / G };
+}
+// 卵黄囊（柔和、半透明的浅杏色小球）和连着它的细蒂；胎儿期开头也用它，直到第 12 周左右消失
+function em_yolk(c, ys, ysR, nav, a, R, d) {
+  if (a <= .01) return;
+  const A = c.globalAlpha; c.globalAlpha = A * a;
+  const sa = smooth(34, 38, d);
+  if (sa > 0) {
+    c.strokeStyle = `rgba(240,206,170,${.42 * sa})`; c.lineWidth = Math.max(1, R * .009); c.lineCap = "round";
+    c.beginPath(); c.moveTo(ys[0], ys[1]); c.quadraticCurveTo(lerp(ys[0], nav[0], .5) - R * .06, lerp(ys[1], nav[1], .5) + R * .03, nav[0], nav[1]); c.stroke();
+  }
+  const yg = c.createRadialGradient(ys[0] - ysR * .35, ys[1] - ysR * .4, ysR * .05, ys[0], ys[1], ysR);
+  yg.addColorStop(0, "rgba(255,240,226,.78)"); yg.addColorStop(.55, "rgba(242,204,174,.62)"); yg.addColorStop(1, "rgba(220,164,146,.55)");
+  c.beginPath(); circ(c, ys[0], ys[1], ysR); c.fillStyle = yg; c.fill();
+  c.lineWidth = Math.max(1, ysR * .05); c.strokeStyle = "rgba(255,236,226,.3)"; c.stroke();
+  c.globalAlpha = A;
+}
+// 羊膜：一圈很薄、带光泽的膜
+function em_amnion(c, amC, amCl, R, a) {
+  if (a <= .01 || amCl <= 1) return;
+  const A = c.globalAlpha; c.globalAlpha = A * a;
+  c.beginPath(); circ(c, amC[0], amC[1], amCl);
+  c.fillStyle = "rgba(255,228,234,.07)"; c.fill();
+  c.lineWidth = Math.max(1, R * .005); c.strokeStyle = "rgba(255,234,240,.38)"; c.stroke();
+  c.beginPath(); c.arc(amC[0], amC[1], amCl * .93, 3.7, 4.5); c.lineWidth = Math.max(1, R * .01); c.strokeStyle = "rgba(255,246,248,.16)"; c.stroke();
+  c.globalAlpha = A;
+}
+// 体蒂：从胚盘尾端到附近囊壁的一段短而粗、肉粉色的组织桥（两端略粗、没有圆头），之后慢慢拉长、变成脐带
+function em_stalk(c, P, w0, w1, a) {
+  if (a <= .01) return;
+  const n = 20, L = [], Rr = [];
+  for (let i = 0; i <= n; i++) {
+    const s = i / n, p = bez(P, s), q = bez(P, Math.min(1, s + .02)), o = bez(P, Math.max(0, s - .02));
+    const tx = q[0] - o[0], ty = q[1] - o[1], l = Math.hypot(tx, ty) || 1, w = lerp(w0, w1, s * s) * (1 - .18 * Math.sin(Math.PI * s)) / 2;
+    L.push([p[0] - ty / l * w, p[1] + tx / l * w]); Rr.push([p[0] + ty / l * w, p[1] - tx / l * w]);
+  }
+  const path = new Path2D(); path.moveTo(L[0][0], L[0][1]);
+  for (const v of L) path.lineTo(v[0], v[1]);
+  for (let i = n; i >= 0; i--) path.lineTo(Rr[i][0], Rr[i][1]);
+  path.closePath();
+  const A = c.globalAlpha; c.save(); c.globalAlpha = A * a; c.lineJoin = "round";
+  c.lineWidth = Math.max(1.5, w0 * .35); c.strokeStyle = "rgba(226,150,160,.25)"; c.stroke(path);
+  const g = c.createLinearGradient(P[0][0], P[0][1], P[3][0], P[3][1]);
+  g.addColorStop(0, "rgba(244,192,186,.85)"); g.addColorStop(1, "rgba(222,148,156,.8)");
+  c.fillStyle = g; c.fill(path);
+  c.restore();
+}
+
+// 孕囊内的结构：羊膜、卵黄囊、体蒂/脐带、胚胎。返回比例 mm/px
+function em_complex(c, W, H, sx, sy, R, d, t, alpha) {
+  const F = em_frame(sx, sy, R, d, t), { M, G, k, X, Y0, bob, sway, nav, ins, wa } = F;
+  c.save(); c.globalAlpha = alpha;
+  // 体蒂 / 脐带：与胎儿期同一条曲线画法，从肚脐（早期是胚盘尾端）到胎盘
+  const P = fx_cordCtl(nav, [Math.cos(F.navA), Math.sin(F.navA)], ins, wa, 0, t);
+  const cA = smooth(35, 40, d), sA = 1 - smooth(37.5, 41, d);
+  c.save(); c.beginPath(); circ(c, sx, sy, R - F.th * .985); c.clip();
+  em_stalk(c, P, Math.max(2, G * lerp(.16, .1, smooth(30, 38, d))), R * lerp(.1, .06, smooth(30, 40, d)), sA);
+  if (cA > 0) {
+    const cord = new Path2D(); cord.moveTo(P[0][0], P[0][1]); cord.bezierCurveTo(P[1][0], P[1][1], P[2][0], P[2][1], P[3][0], P[3][1]);
+    fx_cord(c, cord, P, R * lerp(.04, .052, smooth(36, 56, d)), t, cA);
+  }
+  c.restore();
+  // 生理性脐疝：第 7–10 周肠管暂时挤进脐带根部，形成一个柔软的小鼓包
+  const hn = smooth(47, 53, d);
+  if (hn > 0) {
+    const ca = Math.atan2(P[1][1] - nav[1], P[1][0] - nav[0]), hx = nav[0] + Math.cos(ca) * G * .05, hy = nav[1] + Math.sin(ca) * G * .05;
+    const hg = c.createRadialGradient(hx - G * .01, hy - G * .015, 0, hx, hy, G * .05);
+    hg.addColorStop(0, `rgba(248,212,206,${.7 * hn})`); hg.addColorStop(1, `rgba(226,170,180,${.55 * hn})`);
+    c.beginPath(); c.ellipse(hx, hy, G * .05, G * .032 * hn + G * .015, ca, 0, TAU); c.fillStyle = hg; c.fill();
+  }
+  // 羊膜（早期只是胚盘背侧的穹顶，后来把胚胎整个包住）
+  c.save();
+  if (M.fold < .999) {
+    const A = F.toW(M.at(0)), Bp = F.toW(M.at(1)), mx = (A[0] + Bp[0]) / 2, my = (A[1] + Bp[1]) / 2;
+    const ax = Math.atan2(Bp[1] - A[1], Bp[0] - A[0]), dv = F.yDir + Math.PI, BIG = R * 4, sh = G * (.01 + 4 * M.fold * M.fold);
+    const q0 = em_add(em_add([mx, my], ax, BIG), dv, -sh), q1 = em_add(em_add([mx, my], ax, -BIG), dv, -sh);
+    const q2 = em_add(q1, dv, BIG * 2), q3 = em_add(q0, dv, BIG * 2);
+    c.beginPath(); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); c.lineTo(q2[0], q2[1]); c.lineTo(q3[0], q3[1]); c.closePath(); c.clip();
+  }
+  em_amnion(c, F.amC, F.amCl, R, 1);
+  c.restore();
+  em_yolk(c, F.ys, F.ysR, nav, 1, R, d);
+  c.restore();
+  // 胚胎
+  em_drawEmbryo(c, W, H, M, X, Y0, bob, k, sway, t, alpha);
+  return F.mm;
+}
+
+// 绒毛：孕囊外一圈柔软、分叉的小绒簇（暖粉色、很淡、边缘发虚），靠胎盘一侧又密又长；其余部分逐渐退化
+function em_villi(c, sx, sy, R, d, t, a) {
+  if (a <= 0) return;
+  const r = rng(9), n = 84, am = (em_PLA[0] + em_PLA[1]) / 2;
+  const fade = 1 - .92 * smooth(34, 46, d);
+  c.save(); c.lineCap = "round"; c.lineJoin = "round";
+  c.beginPath(); circ(c, sx, sy, R * 1.035);
+  c.lineWidth = R * .07; c.strokeStyle = `rgba(232,150,164,${.08 * a})`; c.stroke();
+  // 胎盘一侧（叶状绒毛膜）一片更厚、更暖的绒毛层
+  c.beginPath(); c.arc(sx, sy, R * 1.06, em_PLA[0] - .15, em_PLA[1] + .15);
+  c.lineWidth = R * .1; c.strokeStyle = `rgba(226,140,156,${.1 * a})`; c.stroke();
+  const groups = [new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+  const P = (ang, rr) => [sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr];
+  for (let i = 0; i < n; i++) {
+    const ang = (i + r()) / n * TAU, dd = Math.abs(Math.atan2(Math.sin(ang - am), Math.cos(ang - am)));
+    const near = 1 - smooth(.6, 1.3, dd), keep = lerp(fade, 1, near) * (near > .2 || r() < .55 ? 1 : 0);
+    const len = R * (.02 + r() * .025) * (1 + 1.3 * near), bend = (r() - .5) * .9 + Math.sin(t * .5 + i) * .08, br = .5 + r() * .5;
+    if (keep < .06) continue;
+    const p = groups[Math.min(3, Math.floor(keep * 4))], k = len / R;
+    const s0 = P(ang, R * .995), m = P(ang + bend * k * .4, R + len * .5), e = P(ang + bend * k, R + len);
+    p.moveTo(...s0); p.quadraticCurveTo(...m, ...e);
+    // 两三根小分叉
+    for (const [f, sd] of [[.45, 1], [.7, -1]]) {
+      const b0 = P(ang + bend * k * f * .7, R + len * f), b1 = P(ang + bend * k * f + sd * br * k * .9, R + len * (f + .3));
+      p.moveTo(...b0); p.lineTo(...b1);
+    }
+  }
+  groups.forEach((p, i) => {
+    const al = a * (i + .6) / 4;
+    c.lineWidth = R * .014; c.strokeStyle = `rgba(234,156,168,${.17 * al})`; c.stroke(p);
+  });
+  c.restore();
+}
+
+// 柔光斑贴图（内膜基质的明暗斑驳用）
+const em_spr = {};
+function em_blob(dark) {
+  const k = dark ? "d" : "l";
+  if (em_spr[k]) return em_spr[k];
+  const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+  const g = cv.getContext("2d"), rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  const col = dark ? "120,40,60" : "255,214,218";
+  rg.addColorStop(0, `rgba(${col},1)`); rg.addColorStop(.5, `rgba(${col},.45)`); rg.addColorStop(1, `rgba(${col},0)`);
+  g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
+  return em_spr[k] = cv;
+}
+// 四角压暗（与宫内背景同样的做法），让角上的白字在粉色组织上也清楚
+const em_CC = { k: "", cv: null };
+function em_corners(c, W, H, a) {
+  if (a <= .01) return;
+  // 预先画好整幅的四角暗影，每帧按设备像素 1:1 贴图
+  const k = [W, H, DPR].join();
+  if (em_CC.k !== k) {
+    em_CC.k = k; const cv = em_CC.cv || (em_CC.cv = document.createElement("canvas"));
+    cv.width = Math.ceil(W * DPR); cv.height = Math.ceil(H * DPR);
+    const g = cv.getContext("2d"), M = Math.max(W, H), r = M * .4;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    for (const [vx, vy] of [[0, 0], [W, 0], [0, H], [W, H]]) {
+      const vg = g.createRadialGradient(vx, vy, 0, vx, vy, r);
+      vg.addColorStop(0, "rgba(52,14,30,.6)"); vg.addColorStop(.55, "rgba(52,14,30,.28)"); vg.addColorStop(1, "rgba(52,14,30,0)");
+      g.fillStyle = vg; g.fillRect(vx ? vx - r : 0, vy ? vy - r : 0, r, r);
+    }
+  }
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha *= a; c.drawImage(em_CC.cv, 0, 0); c.restore();
+}
 
 // ---------- 着床：囊胚钻进子宫内膜，长成孕囊 ----------
 function sceneImplant(c, W, H, d, t) {
-  const S = Math.min(W, H), cx = W / 2, cy = H * .53;
-  const B = S * lerp(.17, .4, smooth(22, 32, d));
-  const e = smooth(19.5, 24.5, d);
-  const surf = cy - B * lerp(-1.25, 1.15, e);
-  const g = c.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#1d0a12"); g.addColorStop(1, "#2c0f1a");
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  specks(c, W, H, t, 30, "rgba(255,200,215,.07)", 5);
-
-  // 子宫内膜
-  const tg = c.createLinearGradient(0, surf, 0, surf + S * .5);
-  tg.addColorStop(0, "#9a3348"); tg.addColorStop(1, "#5d1427");
-  c.beginPath(); c.moveTo(0, H + 2);
-  for (let x = 0; x <= W; x += 8) c.lineTo(x, surf + Math.sin(x * .03 + 1) * 6 + Math.sin(x * .011) * 9);
-  c.lineTo(W, H + 2); c.closePath(); c.fillStyle = tg; c.fill();
-  const r = rng(21);
-  c.fillStyle = "rgba(60,8,22,.45)"; c.beginPath();
-  for (let i = 0; i < 26; i++) { const x = r() * W, y = surf + 20 + r() * (H - surf); c.moveTo(x + 9, y); c.ellipse(x, y, 4 + r() * 6, 12 + r() * 16, r() - .5, 0, TAU); }
-  c.fill();
-  c.strokeStyle = "rgba(220,60,80,.35)"; c.lineWidth = 1.4;
-  for (let i = 0; i < 14; i++) {
-    let x = r() * W, y = surf + 10 + r() * (H - surf); c.beginPath(); c.moveTo(x, y);
-    for (let k = 0; k < 6; k++) { x += (r() - .5) * 40; y += 12 + r() * 10; c.lineTo(x, y); }
-    c.stroke();
+  const S = Math.min(W, H), cx = W / 2, R = S * .44, cy = H * .52;
+  const B0 = S * .2 * 1.08, by0 = H * .53;
+  const g = smooth(24.5, 29, d);                     // 孕囊长大、视野拉近
+  const Rs = lerp(B0, R, g), sx = cx, sy = lerp(by0, cy, g);
+  const sink = smooth(21.8, 24.5, d);                // 囊胚埋进内膜
+  // 内膜表面高度：囊胚埋进去以后表面很快升出画面上沿（不再横穿左上、右上角的文字）
+  const surf = sy + Rs * lerp(1.1, -1.3, sink) - Rs * .9 * smooth(24.8, 26.2, d);
+  const sc = Rs / B0, dip = Rs * .32 * Math.sin(Math.PI * smooth(21.6, 24.6, d));
+  // 内膜表面：轻轻起伏；囊胚正在钻进去的地方表面向下凹成一个浅杯，把它“吞”进去
+  const wav = x => surf + Math.sin(x * .022 / sc + 1) * 5 * sc + Math.sin(x * .008 / sc + 2) * 8 * sc + dip * Math.exp(-(((x - sx) / (Rs * 1.15)) ** 2));
+  const open = smooth(24, 25.5, d);                  // 孕囊腔出现
+  // 宫腔
+  const tis = 1 - smooth(27.5, 31, d);
+  if (open < 1 || surf - 20 * sc > -2) {
+    const bg = c.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#2a0f1a"); bg.addColorStop(1, "#3c1521");
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    specks(c, W, H, t, 26, "rgba(255,205,215,.08)", 5);
   }
-
-  // 孕囊：囊胚逐渐变成有羊膜腔、卵黄囊和胚盘的结构
-  const m = smooth(23, 26.5, d);
-  c.save(); c.globalAlpha = 1 - m; drawBlastocyst(c, cx, cy, B / 1.05, 1, t); c.restore();
-  if (m > 0) {
-    c.save(); c.globalAlpha = m;
-    const vr = rng(9); c.strokeStyle = "rgba(240,170,170,.6)"; c.lineWidth = Math.max(1, B * .02); c.lineCap = "round"; c.beginPath();
-    for (let i = 0; i < 70; i++) { const a = i / 70 * TAU, l = B * (.06 + vr() * .07); c.moveTo(cx + Math.cos(a) * B, cy + Math.sin(a) * B); c.lineTo(cx + Math.cos(a + .05) * (B + l), cy + Math.sin(a + .05) * (B + l)); }
-    c.stroke();
-    const cg = c.createRadialGradient(cx, cy, B * .2, cx, cy, B);
-    cg.addColorStop(0, "rgba(120,40,60,.9)"); cg.addColorStop(1, "rgba(200,110,120,.95)");
-    c.beginPath(); circ(c, cx, cy, B); c.fillStyle = cg; c.fill();
-    c.lineWidth = B * .03; c.strokeStyle = "rgba(245,190,190,.7)"; c.stroke();
-    c.beginPath(); circ(c, cx - B * .05, cy - B * .16, B * .26); c.fillStyle = "rgba(255,225,230,.22)"; c.fill(); c.lineWidth = 1.5; c.strokeStyle = "rgba(255,230,235,.6)"; c.stroke();
-    const yg = c.createRadialGradient(cx, cy + B * .22, B * .03, cx + B * .03, cy + B * .3, B * .24);
-    yg.addColorStop(0, "#f8e3a6"); yg.addColorStop(1, "#d79a5d");
-    c.beginPath(); circ(c, cx + B * .03, cy + B * .3, B * .23); c.fillStyle = yg; c.fill();
-    c.beginPath(); c.ellipse(cx - B * .01, cy + B * .07, B * .27, B * .05, -.05, 0, TAU); c.fillStyle = "#f2b7b0"; c.fill();
-    c.strokeStyle = "rgba(140,50,60,.45)"; c.lineWidth = 1; c.stroke();
-    c.lineWidth = B * .07; c.strokeStyle = "rgba(220,140,140,.8)"; c.beginPath(); c.moveTo(cx - B * .2, cy + B * .1); c.quadraticCurveTo(cx - B * .5, cy + B * .3, cx - B * .78, cy + B * .55); c.stroke();
+  // 孕囊腔：与胚胎期同一个背景；内膜还完全盖着外围时只画囊内部分（省性能）
+  if (open > 0) {
+    c.save(); c.globalAlpha = open;
+    if (tis >= 1) { c.beginPath(); circ(c, sx, sy, Rs * 1.03); c.clip(); }
+    wombBackdrop(c, W, H, sx, sy, Rs, t, 1); c.restore();
+  }
+  // 子宫内膜（孕囊长大后渐渐过渡成宫内视角的背景）
+  if (tis > 0) {
+    c.save(); c.globalAlpha = tis;
+    c.beginPath(); c.moveTo(-4, H + 4);
+    for (let x = -4; x <= W + 12; x += 8) c.lineTo(x, wav(x));
+    c.lineTo(W + 12, H + 4); c.closePath();
+    if (open > 0) { c.moveTo(sx + Rs * 1.01, sy); c.arc(sx, sy, Rs * 1.01, 0, TAU, true); }
+    const tg = c.createLinearGradient(0, surf - 10, 0, surf + S * .9 * sc);
+    tg.addColorStop(0, "#d27f8b"); tg.addColorStop(.08, "#b85d6c"); tg.addColorStop(.5, "#93404f"); tg.addColorStop(1, "#6e2638");
+    c.fillStyle = tg; c.fill();
+    c.save(); c.clip();
+    const r = rng(21), A = c.globalAlpha;
+    // 基质：柔和的明暗斑驳（不画单独漂着的管子）
+    for (let i = 0; i < 16; i++) {
+      const x = sx + (r() - .5) * 2.4 * W, y = surf + (20 + r() * 1.2 * S) * Math.min(sc, 2.2), s = (40 + r() * 60) * Math.min(sc, 1.6), dk = r() < .45;
+      if (y - s > H || x + s < 0 || x - s > W) continue;
+      c.globalAlpha = A * (dk ? .07 : .06); c.drawImage(em_blob(dk), x - s, y - s * .7, 2 * s, 1.4 * s);
+    }
+    c.globalAlpha = A;
+    // 腺体：从表面往下垂的细长腺管，开口就在表面上；颜色只比基质略浅、很淡，越往下越细，不进入底部文字区
+    c.lineCap = "round"; c.lineJoin = "round";
+    for (let i = 0; i < 12; i++) {
+      const x0 = sx + (i / 11 - .5) * 2.2 * W / Math.min(sc, 2) + (r() - .5) * 30 * sc, len = (55 + r() * 55) * sc, wob = r() * 6, y0 = wav(x0) + 2;
+      if (x0 < -40 || x0 > W + 40 || Math.abs(x0 - sx) < Rs * 1.15) continue;
+      const Lf = [], Rt = [];
+      for (let q = 0; q <= 8; q++) {
+        const y = y0 + q / 8 * len; if (y > H - 40) break;
+        const x = x0 + Math.sin(q * 1.4 + wob) * 3 * sc * q / 8, w = lerp(3, .8, q / 8) * sc;
+        Lf.push([x - w, y]); Rt.push([x + w, y]);
+      }
+      if (Lf.length < 2) continue;
+      c.beginPath(); c.moveTo(Lf[0][0], Lf[0][1]); for (const v of Lf) c.lineTo(v[0], v[1]);
+      for (let k = Rt.length - 1; k >= 0; k--) c.lineTo(Rt[k][0], Rt[k][1]);
+      c.closePath(); c.fillStyle = "rgba(255,212,216,.07)"; c.fill();
+    }
+    c.fillStyle = "rgba(255,214,220,.08)"; c.beginPath();
+    for (let i = 0; i < 180; i++) { const x = sx + (r() - .5) * 2.4 * W, y = surf + 6 + r() * H * 1.3; circ(c, x, y, (1 + r() * 1.3) * Math.min(sc, 2)); }
+    c.fill();
+    // 胚泡周围的蜕膜反应：一圈更暖、更软的组织
+    if (sink > 0) {
+      const dg = c.createRadialGradient(sx, sy, Rs * .95, sx, sy, Rs * 1.45);
+      dg.addColorStop(0, `rgba(222,130,146,${.55 * sink})`); dg.addColorStop(1, "rgba(222,130,146,0)");
+      c.fillStyle = dg; c.fillRect(sx - Rs * 1.5, sy - Rs * 1.5, Rs * 3, Rs * 3);
+      // 合体滋养层：一圈柔软的、略深的绒团，只长在组织里
+      const bl = 1 - smooth(24.6, 26.5, d);
+      if (bl > 0) {
+        const rr = rng(4); c.fillStyle = `rgba(200,104,126,${.42 * sink * bl})`; c.beginPath();
+        for (let i = 0; i < 44; i++) { const a = i / 44 * TAU, e = 1.04 + .1 * rr() + .03 * Math.sin(t * .6 + i); circ(c, sx + Math.cos(a) * Rs * e, sy + Math.sin(a) * Rs * e, Rs * (.08 + .05 * rr())); }
+        c.fill();
+      }
+    }
+    c.restore();
+    // 植入口上方的小封闭塞
+    const plug = smooth(23.6, 24.6, d) * (1 - smooth(25.5, 27, d));
+    if (plug > 0) {
+      c.beginPath(); c.ellipse(sx + Rs * .05, wav(sx) + 1, Rs * .28, Rs * .07, 0, 0, TAU);
+      c.fillStyle = `rgba(236,170,176,${.55 * plug})`; c.fill();
+    }
+    // 表面上皮的亮边
+    c.beginPath();
+    for (let x = -4; x <= W + 12; x += 8) { const y = wav(x); x < 0 ? c.moveTo(x, y) : c.lineTo(x, y); }
+    c.lineWidth = 2.5; c.strokeStyle = "rgba(255,222,226,.4)"; c.stroke();
     c.restore();
   }
-  // 包在孕囊上的一层内膜
-  c.save(); c.globalAlpha = e * .85;
-  c.beginPath(); c.arc(cx, cy, B * 1.08, -Math.PI * .92, -Math.PI * .08); c.lineWidth = B * .12; c.strokeStyle = "#8f2c42"; c.lineCap = "round"; c.stroke();
-  c.restore();
-  const mm = 0.2 * Math.pow(25, smooth(21, 33, d));
-  return mm / (2 * B);
+  // 囊胚：内细胞团转向内膜，一边下沉一边被合体滋养层包住
+  const bl = 1 - smooth(24.6, 26.5, d);
+  if (bl > 0) {
+    const rotB = -2.44 * smooth(20, 22.6, d), Bb = Rs / 1.08;
+    c.save(); c.globalAlpha = bl; c.translate(sx, sy); c.rotate(rotB);
+    drawBlastocyst(c, 0, 0, Bb, mi_hatchAt(d), t);
+    c.restore();
+    // 埋进内膜的部分盖一层半透明的组织，看起来是“钻进去”而不是贴在前面
+    if (sink > 0 && tis > 0) {
+      c.save(); c.beginPath(); c.moveTo(sx - Rs * 1.3, H + 4);
+      for (let x = sx - Rs * 1.3; x <= sx + Rs * 1.3; x += 6) c.lineTo(x, wav(x));
+      c.lineTo(sx + Rs * 1.3, H + 4); c.closePath(); c.clip();
+      const vg = c.createRadialGradient(sx, sy, Rs * .2, sx, sy, Rs * 1.15);
+      vg.addColorStop(0, `rgba(214,128,144,${.28 * bl * tis})`); vg.addColorStop(.85, `rgba(206,116,134,${.4 * bl * tis})`); vg.addColorStop(1, "rgba(206,116,134,0)");
+      c.fillStyle = vg; c.beginPath(); circ(c, sx, sy, Rs * 1.15); c.fill();
+      c.restore();
+    }
+  }
+  em_villi(c, sx, sy, Rs, d, t, smooth(25.2, 28, d));
+  em_corners(c, W, H, tis);
+  // 孕囊内部（与胚胎期同一套布局）
+  const mmB = .1 / (2 * S * .2);
+  if (d < 24) return mmB * Math.exp(Math.log(2.2) * smooth(21, 24, d));
+  const mE = em_complex(c, W, H, sx, sy, Rs, d, t, smooth(24.2, 26.2, d));
+  const sacMM = em_tab([[24, .22], [26, .45], [28, 1], [30, 1.8]], d), mS = sacMM / (2 * Rs);
+  const mB24 = mmB * 2.2;
+  const m1 = Math.exp(lerp(Math.log(mB24), Math.log(mS), smooth(24, 25.5, d)));
+  return Math.exp(lerp(Math.log(m1), Math.log(mE), smooth(26, 31, d)));
 }
 
-// ---------- 胚胎期：C 形身体、尾巴、肢芽、跳动的心脏 ----------
+// ---------- 胚胎期：C 形身体、鳃弓、体节、肢芽到手脚 ----------
 function sceneEmbryo(c, W, H, d, t) {
   const S = Math.min(W, H), R = S * .44, cx = W / 2, cy = H * .52;
-  const e = smooth(29, 56, d);
   wombBackdrop(c, W, H, cx, cy, R, t, 1);
-  const pl = drawPlacenta(c, cx, cy, R, 1.9, 3.2, R * lerp(.05, .09, e), t);
-  const E = R * lerp(.82, 1.02, e);
-  const ex = cx - R * .08, ey = cy + R * .05;
-  const sway = Math.sin(t * .4) * .04;
-  const a0 = lerp(-2.15, -1.75, e) + sway, a1 = lerp(2.55, 1.95, e) + sway, rad = E * lerp(.34, .4, e);
-  const end = lerp(1, .86, smooth(44, 56, d)), hb = lerp(.16, .27, e);
-  const P = s => { const th = lerp(a0, a1, s), rr = rad * (1 - .45 * smooth(.7, 1, s) * (1 - .6 * e)); return [ex + Math.cos(th) * rr, ey + Math.sin(th) * rr, th]; };
-  const Wd = s => E * ((.1 + (hb - .1) * Math.exp(-(((s - .07) / .12) ** 2)) + .03 * Math.exp(-(((s - .42) / .15) ** 2))) * (1 - .88 * smooth(.72, 1, s / end * .98 + .02)));
+  em_villi(c, cx, cy, R, d, t, 1 - smooth(46, 55, d));
+  drawPlacenta(c, cx, cy, R, em_PLA[0], em_PLA[1], R * lerp(.05, .09, smooth(29, 56, d)), t);
+  return em_complex(c, W, H, cx, cy, R, d, t, 1);
+}
+// ---------- 胎儿期（第 8–40 周）：一条闭合曲线勾出“头-颈-背-臀-腹”的侧面轮廓，
+// 四肢是带关节的锥形曲线，手有手指、脚有脚跟脚趾；左上方柔和主光 + 背后透过羊水的轮廓光。
+// 局部坐标：脸朝左、头朝上，长度单位 = 躯干长（颈根到臀）；最后整体旋转、缩放进子宫。
 
-  // 卵黄囊与体蒂
-  const ys = { x: cx + R * .42, y: cy + R * .64, r: R * lerp(.11, .07, e) };
-  const nav = P(.5);
-  drawCord(c, pl.x, pl.y, nav[0] - Math.cos(nav[2]) * Wd(.5) * .6, nav[1] - Math.sin(nav[2]) * Wd(.5) * .6, E * lerp(.05, .07, e), t, .25);
-  c.strokeStyle = "rgba(230,180,120,.6)"; c.lineWidth = Math.max(1, E * .015);
-  c.beginPath(); c.moveTo(ys.x, ys.y); c.quadraticCurveTo(cx + R * .3, cy + R * .3, nav[0] - Math.cos(nav[2]) * Wd(.5), nav[1] - Math.sin(nav[2]) * Wd(.5)); c.stroke();
-  const yg = c.createRadialGradient(ys.x - ys.r * .3, ys.y - ys.r * .3, ys.r * .1, ys.x, ys.y, ys.r);
-  yg.addColorStop(0, "#fbe7b0"); yg.addColorStop(1, "#cf8d52");
-  c.beginPath(); circ(c, ys.x, ys.y, ys.r); c.fillStyle = yg; c.fill();
-  // 羊膜
-  c.beginPath(); circ(c, ex, ey, E * .66); c.fillStyle = "rgba(255,220,230,.06)"; c.fill();
-  c.lineWidth = 1.5; c.strokeStyle = "rgba(255,230,238,.35)"; c.stroke();
+const fx_LT = [-.6, -.8];   // 指向主光源（左上）的单位向量
+const fx_OFF = 6000;        // 内阴影技巧：把形状画到画布外，只让阴影落回来
+let fx_MX = null;
 
-  // 身体（离屏图层）
-  const L = prepLayer(W, H, DPR);
-  const body = [];
-  for (let s = 0; s <= end; s += .012) { const p = P(s); body.push([p[0], p[1], Wd(s)]); }
-  L.fillStyle = "#f0bcb8"; tubeFill(L, body);
-  const limb = (s0, len, ang, wid) => {
-    if (len <= 0) return;
-    const p = P(s0), nx = -Math.cos(p[2]), ny = -Math.sin(p[2]), tx = -Math.sin(p[2]), ty = Math.cos(p[2]);
-    const dx = nx * Math.cos(ang) + tx * Math.sin(ang), dy = ny * Math.cos(ang) + ty * Math.sin(ang);
-    const bx = p[0] + nx * Wd(s0) * .5, by = p[1] + ny * Wd(s0) * .5, pts = [];
-    for (let k = 0; k <= 12; k++) { const q = k / 12; pts.push([bx + dx * len * q, by + dy * len * q, wid * (1 - .25 * q)]); }
-    L.fillStyle = "#eeb3ae"; tubeFill(L, pts);
-    const fx = bx + dx * len, fy = by + dy * len, paddle = smooth(44, 52, d);
-    L.beginPath(); L.ellipse(fx, fy, wid * (1 + .5 * paddle), wid * (.8 + .2 * paddle), Math.atan2(dy, dx) + Math.PI / 2, 0, TAU); L.fill();
-    if (d > 49) { L.beginPath(); for (let k = -1.5; k <= 1.5; k++) { const a = Math.atan2(dy, dx) + k * .38; circ(L, fx + Math.cos(a) * wid * 1.35, fy + Math.sin(a) * wid * 1.35, wid * .32 * smooth(49, 56, d)); } L.fill(); }
-  };
-  limb(.37, E * .3 * smooth(37, 56, d), .55 + sway, E * .045);
-  limb(.68, E * .26 * smooth(41, 58, d), .35, E * .05);
-  // 光影
-  L.save(); L.globalCompositeOperation = "source-atop";
-  const lg = L.createLinearGradient(ex - E * .5, ey - E * .5, ex + E * .5, ey + E * .5);
-  lg.addColorStop(0, "rgba(255,245,240,.45)"); lg.addColorStop(.55, "rgba(255,200,200,0)"); lg.addColorStop(1, "rgba(110,20,40,.45)");
-  L.fillStyle = lg; L.fillRect(0, 0, W, H);
-  L.restore();
-  // 体节、鳃弓、眼点、心脏
-  const so = 1 - smooth(40, 48, d);
-  if (so > 0) {
-    L.fillStyle = `rgba(255,236,236,${.45 * so})`; L.beginPath();
-    for (let s = .22; s < .82 * end; s += .034) { const p = P(s); circ(L, p[0] + Math.cos(p[2]) * Wd(s) * .72, p[1] + Math.sin(p[2]) * Wd(s) * .72, E * .017); }
-    L.fill();
-  }
-  const ar = 1 - smooth(44, 52, d);
-  if (ar > 0 && d > 30) {
-    L.strokeStyle = `rgba(150,50,70,${.5 * ar})`; L.lineWidth = Math.max(1, E * .012);
-    for (const s of [.17, .205, .24]) { const p = P(s), w = Wd(s); L.beginPath(); L.arc(p[0], p[1], w * .85, p[2] + Math.PI - .35, p[2] + Math.PI + .35); L.stroke(); }
-  }
-  const hp = P(.3), hw = Wd(.3), bpm = heartRate(d), beat = bpm ? pulse(t, bpm) : 0;
-  const hx = hp[0] - Math.cos(hp[2]) * hw * .8, hy = hp[1] - Math.sin(hp[2]) * hw * .8, hr = E * .075 * (1 + .14 * beat);
-  const hg = L.createRadialGradient(hx, hy, 0, hx, hy, hr * 1.6);
-  hg.addColorStop(0, `rgba(255,70,90,${.65 + .3 * beat})`); hg.addColorStop(.6, "rgba(220,40,70,.45)"); hg.addColorStop(1, "rgba(220,40,70,0)");
-  L.beginPath(); circ(L, hx, hy, hr * 1.6); L.fillStyle = hg; L.fill();
-  const eo = smooth(39, 47, d);
-  if (eo > 0) {
-    const p = P(.06), w = Wd(.06);
-    L.beginPath(); circ(L, p[0] - Math.cos(p[2] + .5) * w * .35, p[1] - Math.sin(p[2] + .5) * w * .35, E * .036); L.fillStyle = `rgba(40,15,25,${.8 * eo})`; L.fill();
-  }
-  flushLayer(c, .95);
-  return (seriesAt(CRL, d, true) * 10) / E;
+// 关键帧插值：ks = [[x, v], ...]
+function fx_k(x, ks) {
+  if (x <= ks[0][0]) return ks[0][1];
+  for (let i = 1; i < ks.length; i++) if (x <= ks[i][0]) { const a = ks[i - 1], b = ks[i]; return lerp(a[1], b[1], (x - a[0]) / (b[0] - a[0])); }
+  return ks[ks.length - 1][1];
+}
+// 偶尔出现一次的平滑小动作：0 → 1 → 0
+function fx_bump(t, per, ph, w) { const q = ((t + ph) % per + per) % per; return q < w ? Math.sin(Math.PI * q / w) ** 2 : 0; }
+const fx_add = (a, b, s) => [a[0] + b[0] * s, a[1] + b[1] * s];
+const fx_sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const fx_len = a => Math.hypot(a[0], a[1]);
+const fx_nrm = a => { const l = Math.hypot(a[0], a[1]) || 1; return [a[0] / l, a[1] / l]; };
+const fx_lerp2 = (a, b, q) => [a[0] + (b[0] - a[0]) * q, a[1] + (b[1] - a[1]) * q];
+const fx_rot = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+
+// 躯干中线（三次贝塞尔）上的点、切线、背侧/腹侧法线
+function fx_sp(SP, s) {
+  const p = bez(SP, s), u = 1 - s;
+  const dx = 3 * u * u * (SP[1][0] - SP[0][0]) + 6 * u * s * (SP[2][0] - SP[1][0]) + 3 * s * s * (SP[3][0] - SP[2][0]);
+  const dy = 3 * u * u * (SP[1][1] - SP[0][1]) + 6 * u * s * (SP[2][1] - SP[1][1]) + 3 * s * s * (SP[3][1] - SP[2][1]);
+  const l = Math.hypot(dx, dy) || 1, tx = dx / l, ty = dy / l;
+  return { p, t: [tx, ty], b: [ty, -tx], f: [-ty, tx] };
 }
 
-// ---------- 胎儿期：蜷缩的胎儿，随周数变大、长肉、转为头朝下 ----------
+// 两骨 IK：从 A 出发、长 l1 + l2，末端尽量够到 T；关节弯向 pref 方向那一侧
+function fx_ik(A, T, l1, l2, pref) {
+  const dv = fx_sub(T, A), D = clamp(fx_len(dv), Math.abs(l1 - l2) + 1e-3, l1 + l2 - 1e-3), u = fx_nrm(dv);
+  const a = (l1 * l1 - l2 * l2 + D * D) / (2 * D), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const n = [-u[1], u[0]], sd = n[0] * pref[0] + n[1] * pref[1] >= 0 ? 1 : -1;
+  const J = [A[0] + u[0] * a + n[0] * h * sd, A[1] + u[1] * a + n[1] * h * sd];
+  return [J, fx_add(J, fx_nrm(fx_sub(T, J)), l2)];
+}
+
+// 一段肢体（锥形、带肌肉弧度）的闭合轮廓点：A→B，两端半径 rA、rB，两侧鼓起 bp（+n 侧）、bm（-n 侧）
+function fx_segPts(A, B, rA, rB, bp, bm) {
+  const dv = fx_nrm(fx_sub(B, A)), n = [-dv[1], dv[0]], L = fx_len(fx_sub(B, A)), out = [];
+  const pt = (q, side, extra) => { const c = fx_add(A, dv, L * q), r = lerp(rA, rB, q) + extra; return fx_add(c, n, r * side); };
+  for (const q of [0, .35, .7, 1]) out.push(pt(q, 1, bp * Math.sin(Math.PI * q) ** .8));
+  for (const f of [.3, .5, .7]) { const ph = f * Math.PI; out.push([B[0] + (n[0] * Math.cos(ph) + dv[0] * Math.sin(ph)) * rB, B[1] + (n[1] * Math.cos(ph) + dv[1] * Math.sin(ph)) * rB]); }
+  for (const q of [1, .7, .35, 0]) out.push(pt(q, -1, bm * Math.sin(Math.PI * q) ** .8));
+  for (const f of [.3, .5, .7]) { const ph = f * Math.PI; out.push([A[0] - (n[0] * Math.cos(ph) + dv[0] * Math.sin(ph)) * rA, A[1] - (n[1] * Math.cos(ph) + dv[1] * Math.sin(ph)) * rA]); }
+  return out;
+}
+
+// 平滑曲线：经过每个点，切线取相邻两边方向的角平分线；点的第三个分量 k 控制圆滑度（0 = 尖角）
+function fx_path(pts, closed, path) {
+  path = path || new Path2D();
+  const n = pts.length, T = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], a = closed || i > 0 ? pts[(i - 1 + n) % n] : p, b = closed || i < n - 1 ? pts[(i + 1) % n] : p;
+    const u1 = fx_nrm(fx_sub(p, a)), u2 = fx_nrm(fx_sub(b, p));
+    T.push(fx_nrm([u1[0] + u2[0], u1[1] + u2[1]]));
+  }
+  path.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const j = (i + 1) % n, p = pts[i], q = pts[j], L = fx_len(fx_sub(q, p)) / 3;
+    const k1 = (p[2] ?? 1) * L, k2 = (q[2] ?? 1) * L;
+    path.bezierCurveTo(p[0] + T[i][0] * k1, p[1] + T[i][1] * k1, q[0] - T[j][0] * k2, q[1] - T[j][1] * k2, q[0], q[1]);
+  }
+  if (closed) path.closePath();
+  return path;
+}
+function fx_bb(pts, pad) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const p of pts) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
+  return [x0 - pad, y0 - pad, x1 + pad, y1 + pad];
+}
+
+// 头部侧面轮廓（头部局部坐标：脸朝左、头正、颅骨半径 = 1），从下巴底下开始，经脸、额、头顶、枕部到后颈
+// 早期：额头更鼓、鼻子扁、下巴小；后期：鼻梁、嘴唇、肉下巴更清楚
+const fx_HE = [[-.32, 1.0], [-.56, .99], [-.74, .9], [-.8, .79], [-.78, .73, .5], [-.86, .67], [-.86, .59, .6], [-.93, .53], [-.95, .41], [-.97, .27, .8],
+  [-1.04, .04], [-1.02, -.36], [-.8, -.78], [-.2, -1.02], [.5, -.88], [.95, -.3], [.9, .3]];
+const fx_HL = [[-.3, 1.06], [-.62, 1.04], [-.84, .91], [-.9, .77], [-.86, .7, .45], [-.94, .63], [-.92, .53, .55], [-1.05, .45], [-1.0, .29], [-.95, .13, .8],
+  [-1.0, -.06], [-.97, -.42], [-.75, -.79], [-.2, -1.02], [.5, -.88], [.95, -.3], [.92, .3]];
+
+// 计算某天某时刻的姿势（局部坐标）。am = 动作幅度（0 = 静止姿势，用来算外框）
+function fx_pose(d, t, am) {
+  const P = {};
+  const pl = smooth(84, 272, d), gr = smooth(56, 150, d);
+  const hr = fx_k(d, [[50, .56], [63, .5], [84, .43], [112, .36], [140, .315], [200, .272], [240, .268], [280, .266]]);
+  const act = am * lerp(.55, 1, smooth(56, 90, d)) * lerp(1, .45, smooth(215, 280, d));
+  const brth = am * Math.sin(t * 2.1);
+  const bend = fx_k(d, [[56, .13], [140, .14], [280, .17]]);
+  const SP = [[-.13, -.45], [bend * 1.0 - .02, -.37], [bend * 1.25, .17], [-.05, .46]];
+  const fat = (.82 + .14 * gr + .14 * pl) * (1 - .13 * smooth(205, 265, d)) * (1 + .14 * (1 - smooth(57, 88, d)));
+  const wB = s => fx_k(s, [[0, .15], [.12, .212], [.4, .256], [.62, .265], [.88, .235 + .02 * pl], [1, .19 + .01 * pl]]) * fat;
+  const wF = s => fx_k(s, [[0, .12], [.15, .19], [.4, .23], [.62, .26], [.85, .23], [1, .165]]) * fat * (1 + .025 * brth * smooth(.2, .5, s));
+  P.pl = pl; P.hr = hr;
+
+  // 头：下巴贴在胸口；点头时绕后颈转动
+  const mf = smooth(60, 240, d);
+  const hA0 = fx_k(d, [[56, -.6], [100, -.5], [200, -.44], [280, -.42]]);
+  const nod = act * (.05 * Math.sin(t * .37) + .025 * Math.sin(t * .83 + 1));
+  const cq = fx_sp(SP, .1), chinT = fx_add(fx_add(cq.p, cq.f, wF(.1) + .002), cq.t, -.02);
+  const cb = [lerp(fx_HE[1][0], fx_HL[1][0], mf) * hr, lerp(fx_HE[1][1], fx_HL[1][1], mf) * hr];
+  const Hc0 = fx_sub(chinT, fx_rot(cb, hA0)), Np = fx_add(Hc0, fx_rot([.2 * hr, .75 * hr], hA0), 1);
+  const Hc = fx_add(Np, fx_rot(fx_sub(Hc0, Np), nod), 1), hA = hA0 + nod;
+  const ca = Math.cos(hA), sa = Math.sin(hA);
+  const hL = (x, y) => [Hc[0] + (x * ca - y * sa) * hr, Hc[1] + (x * sa + y * ca) * hr];
+  P.hL = hL; P.hA = hA;
+  const body = [];
+  for (let i = 0; i < fx_HE.length; i++) {
+    const a = fx_HE[i], b = fx_HL[i], p = hL(lerp(a[0], b[0], mf), lerp(a[1], b[1], mf));
+    p.push(lerp(a[2] ?? 1, b[2] ?? 1, mf)); body.push(p);
+  }
+  P.nHead = body.length;
+  {
+    const o = body[body.length - 1], q = fx_sp(SP, .1), b1 = fx_add(q.p, q.b, wB(.1)), m = [(o[0] + b1[0]) / 2, (o[1] + b1[1]) / 2];
+    let n = fx_nrm([b1[1] - o[1], o[0] - b1[0]]); if (n[0] < 0) n = [-n[0], -n[1]];
+    body.push(fx_add(m, n, .012));
+  }
+  for (const s of [.1, .27, .46, .65, .84, 1]) { const q = fx_sp(SP, s); body.push(fx_add(q.p, q.b, wB(s))); }
+  const e = fx_sp(SP, 1), rb = wB(1), rf = wF(1);
+  for (const f of [.2, .4, .6, .8]) {
+    const ph = f * Math.PI, r = lerp(rb, rf, f) * (1 + .04 * Math.sin(ph));
+    body.push(fx_add(e.p, [e.b[0] * Math.cos(ph) + e.t[0] * Math.sin(ph), e.b[1] * Math.cos(ph) + e.t[1] * Math.sin(ph)], r));
+  }
+  P.rump = fx_add(e.p, e.t, (rb + rf) / 2);
+  for (const s of [1, .82, .62, .42, .24, .1]) { const q = fx_sp(SP, s); body.push(fx_add(q.p, q.f, wF(s))); }
+  // 孕晚期下巴抵在胸口：把下巴底下的小凹口补平，下巴和胸口之间不再露出羊水
+  const nk = smooth(125, 175, d);
+  if (nk > 0) {
+    const nb = body.length, Bq = body[nb - 1], C = body[1], U = body[0], f = fx_sp(SP, .05).f;
+    const tg = fx_add(fx_lerp2(Bq, C, .5), f, fx_len(fx_sub(C, Bq)) * .2 + .008);
+    body[0] = [lerp(U[0], tg[0], nk), lerp(U[1], tg[1], nk), U[2]];
+  }
+  P.nk = nk;
+  P.body = body;
+  P.mid = fx_sp(SP, .55).p;
+  const nq = fx_sp(SP, .64); P.navel = fx_add(nq.p, nq.f, wF(.64) * .88); P.navN = nq.f;
+  const hq = fx_sp(SP, .3); P.heart = fx_add(hq.p, hq.f, wF(.3) * .35);
+
+  // 手臂：近侧的手放在嘴边，远侧的手在胸前
+  const Lua = fx_k(d, [[56, .22], [140, .3], [280, .34]]), Lfa = fx_k(d, [[56, .2], [140, .27], [280, .3]]);
+  const Lh = fx_k(d, [[56, .11], [140, .145], [280, .17]]);
+  const rS = fx_k(d, [[56, .052], [140, .066], [280, .086]]), rE = fx_k(d, [[56, .038], [140, .048], [280, .063]]), rW = fx_k(d, [[56, .029], [140, .036], [280, .048]]);
+  const sq = fx_sp(SP, .2), Sh = fx_add(sq.p, sq.f, wF(.2) * .06);
+  const wig = act * (Math.sin(t * 1.1) * .03 + Math.sin(t * 2.3) * .015);
+  const stretch = act * fx_bump(t, 13.7, 4, 3.2) * (1 - .6 * smooth(220, 270, d));
+  const nkA = smooth(185, 228, d);
+  let [El, Wr] = fx_ik(Sh, hL(lerp(-.74, -.5, nkA) + wig - .45 * stretch, lerp(1.3, 1.12, nkA) - .8 * stretch), Lua, Lfa, [-.35, 1]);
+  P.armN = { S: Sh, E: El, W: Wr, rS, rE, rW, hd: fx_nrm(fx_sub(hL(-1.0, .62 - .5 * stretch), Wr)), hl: Lh };
+  const Sh2 = fx_add(Sh, [.03, .05], 1);
+  [El, Wr] = fx_ik(Sh2, hL(-.42, 1.6), Lua, Lfa, [-.2, 1]);
+  P.armF = { S: Sh2, E: El, W: Wr, rS, rE, rW, hd: fx_nrm(fx_sub(hL(-.95, 1.1), Wr)), hl: Lh };
+
+  // 腿：大腿贴着肚子向前上方屈起，小腿折回，脚在臀前；偶尔轻轻蹬一下
+  const Lth = fx_k(d, [[56, .21], [140, .35], [280, .39]]), Lsh = fx_k(d, [[56, .19], [140, .31], [280, .35]]);
+  const Lft = fx_k(d, [[56, .11], [140, .19], [280, .222]]);
+  const rH = fx_k(d, [[56, .078], [140, .106], [200, .12], [280, .118]]), rK = fx_k(d, [[56, .05], [140, .064], [280, .074]]), rA = fx_k(d, [[56, .034], [140, .042], [280, .056]]);
+  const hpq = fx_sp(SP, .87), Hp = fx_add(hpq.p, hpq.f, wF(.87) * .3);
+  const kick = act * fx_bump(t, 9.3, 1.5, 1.6), kick2 = act * fx_bump(t, 11.9, 7, 1.9);
+  const LL = Lth + Lsh;
+  let [Kn, An] = fx_ik(Hp, fx_add(Hp, fx_nrm([-.97, .02 + .55 * kick]), LL * (.3 + .3 * kick)), Lth, Lsh, [-.5, -.87]);
+  P.legN = { H: Hp, K: Kn, A: An, rH, rK, rA, fl: Lft, flex: .15 * kick + .08 * Math.sin(t * .7) * act };
+  const Hp2 = fx_add(Hp, [.03, -.05], 1);
+  // 远侧的脚：孕晚期稍微错开一点，从近侧小腿旁边露出脚尖（看得出是两只脚）
+  const fl2 = smooth(200, 250, d);
+  [Kn, An] = fx_ik(Hp2, fx_add(Hp2, fx_nrm([-.85 - .2 * kick2 - .08 * fl2, .32 - .5 * fl2]), LL * (.32 + .26 * kick2 + .1 * fl2)), Lth, Lsh, [-.45, -.9]);
+  P.legF = { H: Hp2, K: Kn, A: An, rH, rK, rA, fl: Lft, flex: .25 + .2 * kick2 };
+
+  P.eye = [lerp(-.67, -.71, mf), lerp(.3, .16, mf)];
+  P.ear = [lerp(.22, .1, smooth(56, 126, d)), lerp(.76, .3, smooth(56, 126, d))];
+  return P;
+}
+
+// 柔和阴影统一画在 1/4 分辨率的小画布上再放大合成：模糊本来就是软的，这样省掉大半开销。
+// 形状本身画到画布外（fx_OFF），只让它的阴影落回来，边缘不会出现硬线。
+const fx_SC = document.createElement("canvas"), fx_SX = fx_SC.getContext("2d"), fx_Q = 4;
+function fx_lowPrep(W, H) {
+  const w = Math.ceil(W * DPR / fx_Q) + 2, h = Math.ceil(H * DPR / fx_Q) + 2;
+  if (fx_SC.width !== w || fx_SC.height !== h) { fx_SC.width = w; fx_SC.height = h; }
+  fx_SX.setTransform(1, 0, 0, 1, 0, 0); fx_SX.clearRect(0, 0, w, h);
+  const k = DPR / fx_Q; fx_SX.setTransform(k, 0, 0, k, 0, 0);
+  return fx_SX;
+}
+// 内阴影：形状外一圈投下的模糊阴影（之后裁剪到形状内部）
+function fx_lowInner(path, bb, col, blur, off) {
+  const S = fx_SX, k = DPR / fx_Q, [x0, y0, x1, y1] = bb, m = blur * 1.6 + off + 4;
+  const ring = new Path2D(); ring.rect(x0 - m + fx_OFF, y0 - m, x1 - x0 + 2 * m, y1 - y0 + 2 * m);
+  ring.addPath(path, fx_MX || (fx_MX = new DOMMatrix([1, 0, 0, 1, fx_OFF, 0])));
+  S.shadowColor = col; S.shadowBlur = blur * k;
+  S.shadowOffsetX = (fx_LT[0] * off - fx_OFF) * k; S.shadowOffsetY = fx_LT[1] * off * k;
+  S.fillStyle = "#000"; S.fill(ring, "evenodd"); S.shadowColor = "transparent";
+}
+// 投影：形状向右下方投下的模糊阴影
+function fx_lowCast(path, blur, off, a) {
+  const S = fx_SX, k = DPR / fx_Q, p = new Path2D(); p.addPath(path, fx_MX || (fx_MX = new DOMMatrix([1, 0, 0, 1, fx_OFF, 0])));
+  S.shadowColor = `rgba(112,36,54,${a})`; S.shadowBlur = blur * k;
+  S.shadowOffsetX = (-fx_LT[0] * off - fx_OFF) * k; S.shadowOffsetY = -fx_LT[1] * off * k;
+  S.fillStyle = "#000"; S.fill(p); S.shadowColor = "transparent";
+}
+// 把小画布 bb 区域放大合成到图层：clip = 只画在形状内；否则 source-atop 只落在已画像素上
+function fx_lowFlush(L, bb, clip) {
+  const k = DPR / fx_Q, sx = Math.max(0, Math.floor(bb[0] * k)), sy = Math.max(0, Math.floor(bb[1] * k));
+  const ex = Math.min(fx_SC.width, Math.ceil(bb[2] * k) + 1), ey = Math.min(fx_SC.height, Math.ceil(bb[3] * k) + 1);
+  if (ex <= sx || ey <= sy) return;
+  L.save();
+  if (clip) L.clip(clip); else L.globalCompositeOperation = "source-atop";
+  L.drawImage(fx_SC, sx, sy, ex - sx, ey - sy, sx / k, sy / k, (ex - sx) / k, (ey - sy) / k);
+  L.restore();
+}
+// 圆柱体明暗：沿肢体横截面算一次朗伯光照（光从左上前方来），背光边缘带一点透光的亮边。
+// 随身体旋转连续变化，不会突然翻转
+function fx_tone(col, u, ln, rimK) {
+  const I = clamp(u * ln * .7 + Math.sqrt(Math.max(0, 1 - u * u)) * .72, 0, 1);
+  const c = I > .55 ? mix(col, [255, 246, 238], (I - .55) / .45 * .28) : mix(col, [170, 82, 100], (.55 - I) / .55 * .3);
+  const rim = smooth(.72, 1, Math.abs(u)) * (1 - I) * rimK;
+  return mix(c, [255, 224, 216], rim);
+}
+function fx_cyl(L, path, A, B, r, col, rimK) {
+  const dv = fx_nrm(fx_sub(B, A)), n = [-dv[1], dv[0]], m = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+  const ln = n[0] * fx_LT[0] + n[1] * fx_LT[1];
+  const g = L.createLinearGradient(m[0] - n[0] * r, m[1] - n[1] * r, m[0] + n[0] * r, m[1] + n[1] * r);
+  for (const u of [-1, -.8, -.5, -.15, .2, .55, .82, 1]) g.addColorStop((u + 1) / 2, rgb(fx_tone(col, u, ln, rimK)));
+  L.fillStyle = g; L.fill(path);
+}
+
+// 手：手背、四根分开且微弯的手指、翘起的拇指（世界坐标，像素）。n 指向拇指一侧
+function fx_hand(L, Wp, dir, n, hl, rw, skin, edge) {
+  const hw = hl * .5;
+  const at = (a, b) => [Wp[0] + dir[0] * a + n[0] * b, Wp[1] + dir[1] * a + n[1] * b];
+  L.lineCap = "round"; L.lineJoin = "round";
+  const lens = [.4, .44, .41, .33], wid = [.105, .105, .1, .088];
+  const ew = Math.max(.8, hl * .025);
+  for (let i = 3; i >= 0; i--) {
+    const b = hw * (.33 - .22 * i), l = hl * lens[i], s0 = at(hl * .48, b);
+    const m = at(hl * .48 + l * .55, b * 1.08 - l * .05), e = at(hl * .48 + l * .95, b * 1.12 - l * .2);
+    const f = new Path2D(); f.moveTo(s0[0], s0[1]); f.quadraticCurveTo(m[0], m[1], e[0], e[1]);
+    const fw = Math.max(.9, hl * wid[i]);
+    L.strokeStyle = edge; L.lineWidth = fw + ew * 2; L.stroke(f);
+    L.strokeStyle = rgb(mix(skin, [255, 244, 236], .04 * (3 - i))); L.lineWidth = fw; L.stroke(f);
+  }
+  const palm = fx_path([at(-hl * .02, rw * .95), at(hl * .25, hw * .5), at(hl * .5, hw * .46), at(hl * .56, hw * .1), at(hl * .54, -hw * .3), at(hl * .46, -hw * .44), at(hl * .22, -hw * .46), at(-hl * .02, -rw * .95)], true);
+  const pg = L.createLinearGradient(...at(hl * .3, hw * .6), ...at(hl * .3, -hw * .6));
+  pg.addColorStop(0, rgb(mix(skin, [255, 244, 236], .16))); pg.addColorStop(1, rgb(mix(skin, [190, 104, 112], .12)));
+  L.fillStyle = pg; L.fill(palm);
+  // 指根处淡淡的指缝
+  L.strokeStyle = edge; L.lineWidth = ew; L.beginPath();
+  for (let i = 0; i < 3; i++) { const b = hw * (.22 - .22 * i), p0 = at(hl * .44, b), p1 = at(hl * .53, b); L.moveTo(p0[0], p0[1]); L.lineTo(p1[0], p1[1]); }
+  L.stroke();
+  const t0 = at(hl * .14, hw * .4), tm = at(hl * .36, hw * .78), te = at(hl * .56, hw * .82);
+  const th = new Path2D(); th.moveTo(t0[0], t0[1]); th.quadraticCurveTo(tm[0], tm[1], te[0], te[1]);
+  const tw = Math.max(1, hl * .13);
+  L.strokeStyle = edge; L.lineWidth = tw + ew * 2; L.stroke(th);
+  L.strokeStyle = rgb(mix(skin, [255, 244, 236], .1)); L.lineWidth = tw; L.stroke(th);
+  return [at(0, 0), at(hl * 1.05, 0), at(hl * .5, hw), at(hl * .5, -hw)];
+}
+
+// 脚：圆圆的脚跟、肉乎乎的脚底、脚背和一排脚趾（世界坐标）。dirT 指向脚尖，sole 指向脚底
+function fx_footPts(dirT, sole, A, fl, rA) {
+  const p = (a, b) => [A[0] + dirT[0] * a + sole[0] * b, A[1] + dirT[1] * a + sole[1] * b];
+  return [p(-rA * .85, -rA * .55), p(-rA * 1.05, rA * .4), p(-rA * .62, rA * 1.08), p(fl * .18, rA * 1.2), p(fl * .45, rA * 1.12), p(fl * .74, rA * 1.18),
+    p(fl * .94, rA * .98), p(fl * 1.0, rA * .42), p(fl * .96, -rA * .2), p(fl * .8, -rA * .32), p(fl * .48, -rA * .6), p(fl * .17, -rA * .95)];
+}
+function fx_toes(L, dirT, sole, A, fl, rA, col, edge) {
+  const P = (u, v) => [A[0] + dirT[0] * u + sole[0] * v, A[1] + dirT[1] * u + sole[1] * v];
+  // 大脚趾在上面鼓起一点；其余脚趾只画几道柔和的趾缝
+  const bt = P(fl * .9, rA * .02), g = L.createRadialGradient(bt[0], bt[1], 0, bt[0], bt[1], rA * .42);
+  g.addColorStop(0, rgb(mix(col, [255, 244, 236], .14))); g.addColorStop(1, rgb(mix(col, [255, 244, 236], .14), 0));
+  L.fillStyle = g; L.beginPath(); circ(L, bt[0], bt[1], rA * .42); L.fill();
+  L.strokeStyle = edge; L.lineWidth = Math.max(.6, rA * .075); L.beginPath();
+  for (let k = 0; k < 4; k++) {
+    const v = rA * (.2 + k * .2), u0 = fl * (.99 - Math.abs(k - 1.2) * .02), a = P(u0, v), m = P(u0 - fl * .08, v + rA * .02), e = P(u0 - fl * .15, v + rA * .05);
+    L.moveTo(a[0], a[1]); L.quadraticCurveTo(m[0], m[1], e[0], e[1]);
+  }
+  L.stroke();
+}
+
+// 脐带：与环境/胚胎场景的 drawCord 同一画法（半透明胶质 + 居中的蓝紫静脉 + 两条螺旋缠绕的玫瑰色动脉），沿本场景的贝塞尔路径绘制
+function fx_cord(L, cord, pts, cw, t, a) {
+  if (a <= 0) return;
+  const n = 64, sp = [], nr = [];
+  for (let i = 0; i <= n; i++) sp.push(bez(pts, i / n));
+  for (let i = 0; i <= n; i++) { const tg = fx_nrm(fx_sub(sp[Math.min(n, i + 1)], sp[Math.max(0, i - 1)])); nr.push([-tg[1], tg[0]]); }
+  const off = k => { const p = new Path2D(); sp.forEach((v, i) => { const x = v[0] + nr[i][0] * k, y = v[1] + nr[i][1] * k; i ? p.lineTo(x, y) : p.moveTo(x, y); }); return p; };
+  let acc = 0; const phs = [0];
+  for (let i = 1; i <= n; i++) { acc += fx_len(fx_sub(sp[i], sp[i - 1])); phs.push(acc / (cw * 4.2) * TAU + t * .15); }
+  const amp = cw * .25;
+  const strand = front => {
+    const p = new Path2D();
+    for (let k = 0; k < 2; k++) {
+      let on = false;
+      for (let i = 0; i <= n; i++) {
+        const f = phs[i] + k * Math.PI, isF = Math.cos(f) > -.05;
+        const x = sp[i][0] + nr[i][0] * Math.sin(f) * amp, y = sp[i][1] + nr[i][1] * Math.sin(f) * amp;
+        if (isF === front || (front && Math.abs(Math.cos(f)) < .15)) { on ? p.lineTo(x, y) : p.moveTo(x, y); on = true; } else on = false;
+      }
+    }
+    return p;
+  };
+  L.save(); L.globalAlpha = a; L.lineCap = "butt"; L.lineJoin = "round";
+  L.lineWidth = cw * 1.12; L.strokeStyle = "rgba(170,96,120,.3)"; L.stroke(cord);
+  L.lineWidth = cw; L.strokeStyle = "rgba(236,200,208,.7)"; L.stroke(cord);
+  L.lineCap = "round"; L.lineWidth = cw * .18; L.strokeStyle = "rgba(196,110,138,.3)"; L.stroke(strand(false));
+  L.lineCap = "butt"; L.lineWidth = cw * .3; L.strokeStyle = "rgba(140,120,190,.5)"; L.stroke(cord);
+  L.lineCap = "round"; L.lineWidth = cw * .21; L.strokeStyle = "rgba(208,106,134,.72)"; L.stroke(strand(true));
+  L.lineCap = "butt";
+  L.lineWidth = cw * .82; L.strokeStyle = "rgba(250,228,232,.2)"; L.stroke(cord);
+  const nm = nr[n >> 1], hs = (nm[0] + nm[1] < 0 ? 1 : -1) * cw * .27;
+  L.lineWidth = Math.max(.8, cw * .11); L.strokeStyle = "rgba(255,246,246,.42)"; L.stroke(off(hs));
+  L.restore();
+}
+
+// 脐带的贝塞尔控制点：从肚脐出发（先沿肚脐朝外的方向），到胎盘上的插入点（胚胎期也用同一画法，交接时两条脐带重合）
+function fx_cordCtl(nv, nN, ins, ia, turn, t) {
+  const toPl = fx_nrm(fx_sub(ins, nv)), nn = fx_nrm(fx_lerp2(nN, toPl, .25 + .55 * turn));
+  const dist = fx_len(fx_sub(ins, nv)), sw = Math.sin(t * .45) * .05;
+  const bw2 = dist * (.16 * turn + sw);   // 转身后脐带绕着身体弯一点，不是一根直杆
+  const q1 = [nv[0] + nn[0] * dist * .42 - toPl[1] * bw2, nv[1] + nn[1] * dist * .42 + toPl[0] * bw2 + dist * .3 * (1 - .75 * turn)];
+  const q2 = [ins[0] - Math.cos(ia) * dist * .45 - toPl[1] * dist * (.06 * turn - sw), ins[1] - Math.sin(ia) * dist * .45 + toPl[0] * dist * (.06 * turn - sw) - dist * .1 * (1 - turn)];
+  return [nv, q1, q2, ins];
+}
+
 function sceneFetus(c, W, H, d, t) {
   const S = Math.min(W, H), R = S * .44, cx = W / 2, cy = H * .52;
-  const u = clamp((d - 56) / 224, 0, 1);
+  const turn = smooth(196, 245, d), cramp = smooth(200, 280, d);
   wombBackdrop(c, W, H, cx, cy, R, t, 0);
-  const pl = drawPlacenta(c, cx, cy, R, 1.85, 3.25, R * lerp(.09, .16, u), t);
+  const plTh = R * fx_k(d, [[56, .09], [280, .15]]), pl = drawPlacenta(c, cx, cy, R, 1.95, 3.35, plTh, t);
 
-  const Lp = R * (.8 + .6 * u);
-  const act = d < 70 ? .45 : d < 210 ? 1 : lerp(1, .4, smooth(210, 280, d));
-  const turn = smooth(196, 245, d);
-  const ang = lerp(-.25, Math.PI - .12, turn) + Math.sin(t * .22) * .16 * act * (1 - .7 * turn);
-  const hr = lerp(.29, .2, Math.pow(u, .7));
-  const plump = lerp(.6, .95, smooth(.12, 1, u)), lp = lerp(.7, 1.05, smooth(.12, 1, u));
-  const legLen = lerp(.78, 1, u), armLen = lerp(.85, 1, u);
-  const kick = Math.pow(Math.max(0, Math.sin(t * 1.3)), 8) * act;
-  const kick2 = Math.pow(Math.max(0, Math.sin(t * .9 + 2)), 10) * act;
-  const nod = Math.sin(t * .5) * .05 * act, br = 1 + Math.sin(t * 2.2) * .012 * act;
-  const sp = [[.02, -.2], [.3, -.15], [.31, .28], [.04, .37]];
-  const rb = s => plump * (.065 + .11 * Math.sin(Math.PI * (.12 + .78 * s))) * br;
-  const ccx = lerp(.04, .09, u), ccy = lerp(-.15, -.035, u);
-  const toW = (x, y) => { const v = rot2([(x - ccx) * Lp, (y - ccy) * Lp], ang); return [cx + v[0], cy + v[1]]; };
+  // 静止姿势算外框 → 缩放到子宫里，任何旋转角度都不出界
+  const rest = fx_pose(d, 0, 0), P = fx_pose(d, t, 1);
+  const ext = [...rest.body, rest.armN.E, rest.armN.W, rest.legN.K, rest.legN.A, rest.legF.K, rest.legF.A];
+  const bb0 = fx_bb(ext, 0), pv = [(bb0[0] + bb0[2]) / 2, (bb0[1] + bb0[3]) / 2];
+  let E = 0; for (const p of ext) E = Math.max(E, fx_len(fx_sub(p, pv)));
+  E += .07;
+  let sc = R * fx_k(d, [[56, .56], [100, .63], [160, .74], [220, .85], [250, .92], [280, .97]]) / E;
+  let ang = lerp(-.12, Math.PI - .1, turn) + (Math.sin(t * .21) * .06 + Math.sin(t * .13 + 2) * .04) * (1 - .75 * cramp);
+  let ox = cx + R * (lerp(-.06, 0, smooth(56, 120, d)) + Math.sin(t * .17) * .015 * (1 - cramp));
+  let oy = cy + R * (lerp(.04, 0, smooth(56, 120, d)) + Math.sin(t * .23 + 1) * .015 * (1 - cramp));
+  // 与胚胎期交接（第 55–61 天）：先把胎儿的头心和臀部对准胚胎的头心和臀部（位置、大小、朝向都一样），
+  // 再慢慢回到胎儿期自己的位置，交叉淡化时两个身体叠在一起，不会出现两个头、两个轮廓
+  const F = d < 61 ? em_frame(cx, cy, R, d, t) : null, hb = F ? smooth(57, 61, d) : 1;
+  if (F) {
+    const M = F.M, hcW = F.toW(M.hc), ra = M.at(1), rW = F.toW([ra[0] + Math.cos(ra[2]) * ra[3] * .6, ra[1] + Math.sin(ra[2]) * ra[3] * .6]);
+    const Hl = rest.hL(0, 0), Rl = rest.rump;
+    const sA = fx_len(fx_sub(hcW, rW)) / fx_len(fx_sub(Hl, Rl));
+    let aA = Math.atan2(hcW[1] - rW[1], hcW[0] - rW[0]) - Math.atan2(Hl[1] - Rl[1], Hl[0] - Rl[0]);
+    aA = ang + Math.atan2(Math.sin(aA - ang), Math.cos(aA - ang));
+    const v = fx_rot([(Hl[0] - pv[0]) * sA, (Hl[1] - pv[1]) * sA], aA);
+    sc = Math.exp(lerp(Math.log(sA), Math.log(sc), hb)); ang = lerp(aA, ang, hb);
+    ox = lerp(hcW[0] - v[0], ox, hb); oy = lerp(hcW[1] - v[1], oy, hb);
+  }
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const toW = p => { const x = (p[0] - pv[0]) * sc, y = (p[1] - pv[1]) * sc; const o = [ox + x * ca - y * sa, oy + x * sa + y * ca]; if (p.length > 2) o.push(p[2]); return o; };
+  const dW = v => [v[0] * ca - v[1] * sa, v[0] * sa + v[1] * ca];
+  const hW = (x, y) => toW(P.hL(x, y));
+  const px = v => v * sc;
+  // 整体光照：左上方暖亮、右下方稍暗，按部位所在位置给底色上色
+  const lit = (col, p) => { const f = clamp(((p[0] - ox) * -fx_LT[0] + (p[1] - oy) * -fx_LT[1]) / R, -1, 1); return f < 0 ? mix(col, [255, 240, 230], -f * .14) : mix(col, [150, 60, 80], f * .16); };
+  const all = [];   // 所有画到图层上的点，用来限定合成区域
+  let bodyPath = null;
 
-  // 关键点（局部坐标，脸朝左，头朝上）
-  const N = bez(sp, 0), ho = rot2([-.07, -hr * .92], nod), Hc = [N[0] + ho[0], N[1] + ho[1]];
-  const f = (dx, dy) => { const o = rot2([dx * hr, dy * hr], nod); return [Hc[0] + o[0], Hc[1] + o[1]]; };
-  const sh = bez(sp, .13), Sh = [sh[0] - .05, sh[1] + .03], El = [Sh[0] - .04 * armLen, Sh[1] + .14 * armLen];
-  const wig = Math.sin(t * .9) * .015 * act, hm = f(-.55, 1.1), Hd = [hm[0] + wig, hm[1] - wig];
-  const Sh2 = [Sh[0] + .05, Sh[1] - .01], El2 = [Sh2[0] - .08, Sh2[1] + .2 * armLen], Hd2 = [El2[0] - .14 * armLen, El2[1] - .08];
-  const hp = bez(sp, .86), Hp = [hp[0] - .06, hp[1]];
-  const K = [Hp[0] - .25 * legLen - .05 * kick, Hp[1] - .17 * legLen + .08 * kick];
-  const F = [K[0] + .1 * legLen - .1 * kick, K[1] + .25 * legLen + .08 * kick];
-  const Hp2 = [Hp[0] + .04, Hp[1] - .03];
-  const K2 = [Hp2[0] - .23 * legLen - .04 * kick2, Hp2[1] - .22 * legLen + .06 * kick2];
-  const F2 = [K2[0] + .13 * legLen - .08 * kick2, K2[1] + .24 * legLen + .05 * kick2];
-
-  // 脐带在胎儿身后
-  const nv = bez(sp, .62), navel = toW(nv[0] - rb(.62) * .9, nv[1]);
-  drawCord(c, pl.x, pl.y, navel[0], navel[1], R * lerp(.03, .045, u), t, .35);
-
-  const skinA = [234, 146, 150], skinB = [242, 176, 164], skinC = [246, 202, 182];
-  const skin = u < .45 ? mix(skinA, skinB, u / .45) : mix(skinB, skinC, (u - .45) / .55);
-  const far = mix(skin, [196, 104, 118], .3);
+  // 颜色：早期透亮的粉色 → 后期饱满的桃色
+  const skin = d < 140 ? mix([238, 168, 166], [243, 184, 170], smooth(56, 140, d)) : mix([243, 184, 170], [247, 205, 182], smooth(140, 270, d));
+  const far = mix(skin, [204, 122, 134], .24);
+  const edge = rgb(mix(skin, [160, 74, 90], .5), .45);
 
   const L = prepLayer(W, H, DPR);
-  const local = () => { L.translate(cx, cy); L.rotate(ang); L.scale(Lp, Lp); L.translate(-ccx, -ccy); };
-  L.save(); local();
-  // 远侧手脚
-  L.fillStyle = rgb(far);
-  seg(L, Sh2, El2, .04 * lp, .035 * lp); seg(L, El2, Hd2, .035 * lp, .03 * lp); blob(L, Hd2, .04 * lp, .032 * lp, 0);
-  seg(L, Hp2, K2, .068 * lp, .055 * lp); seg(L, K2, F2, .05 * lp, .036 * lp);
-  blob(L, F2, .07 * legLen, .03 * lp, Math.atan2(F2[1] - K2[1], F2[0] - K2[0]) + Math.PI / 2);
-  // 身体、头
-  L.fillStyle = rgb(skin);
-  L.beginPath();
-  for (let s = 0; s <= 1.001; s += .02) { const p = bez(sp, s); circ(L, p[0], p[1], rb(s)); }
-  const rp = bez(sp, .95); circ(L, rp[0] + .015, rp[1] - .01, rb(.95) * 1.08);
-  circ(L, Hc[0], Hc[1], hr);
-  L.fill();
-  blob(L, f(-.42, .5), .54 * hr, .46 * hr, .3);
-  L.beginPath(); circ(L, ...f(-.93, .3), .13 * hr); L.fill();
-  // 近侧手脚（带一点阴影区分层次）
-  L.shadowColor = "rgba(80,15,30,.22)"; L.shadowBlur = Lp * .015 * DPR;
-  seg(L, Hp, K, .075 * lp, .06 * lp); seg(L, K, F, .056 * lp, .04 * lp);
-  blob(L, F, .075 * legLen, .032 * lp, Math.atan2(F[1] - K[1], F[0] - K[0]) + Math.PI / 2);
-  seg(L, Sh, El, .046 * lp, .038 * lp); seg(L, El, Hd, .038 * lp, .032 * lp); blob(L, Hd, .046 * lp, .036 * lp, .6);
-  L.shadowBlur = 0; L.shadowColor = "transparent";
-  L.restore();
+  L.lineCap = "round"; L.lineJoin = "round";
 
-  // 光影：世界坐标，光从左上方来
-  L.save(); L.globalCompositeOperation = "source-atop";
-  const lg = L.createLinearGradient(cx - R * .7, cy - R * .8, cx + R * .7, cy + R * .7);
-  lg.addColorStop(0, "rgba(255,246,240,.45)"); lg.addColorStop(.5, "rgba(255,220,210,0)"); lg.addColorStop(1, "rgba(100,18,40,.42)");
-  L.fillStyle = lg; L.fillRect(0, 0, W, H);
-  L.restore();
+  // 脐带：始终从肚脐出来（埋在一圈皮肤的脐轮下），压在身体前面、近侧手脚下面，一路通到胎盘表面（在胎盘表面处裁齐）
+  const ia = pl.a, nv = toW(P.navel);
+  const ins = [cx + Math.cos(ia) * (R - plTh * .6), cy + Math.sin(ia) * (R - plTh * .6)];
+  const cordPts = fx_cordCtl(nv, dW(P.navN), ins, ia, turn, t), [, q1, q2] = cordPts;
+  const cw = lerp(R * .052, Math.max(3, px(.066)), hb);
+  const cord = new Path2D(); cord.moveTo(nv[0], nv[1]); cord.bezierCurveTo(q1[0], q1[1], q2[0], q2[1], ins[0], ins[1]);
+  all.push(...cordPts);
 
-  // 细节
-  L.save(); local(); L.lineCap = "round";
-  const sd = .4 * (1 - smooth(90, 150, d));
-  if (sd > 0) {
-    L.fillStyle = `rgba(255,240,240,${sd})`; L.beginPath();
-    for (let s = .04; s < .98; s += .055) {
-      const a = bez(sp, Math.max(0, s - .01)), b = bez(sp, s + .01), p = bez(sp, s);
-      const tx = b[0] - a[0], ty = b[1] - a[1], m = Math.hypot(tx, ty) || 1;
-      circ(L, p[0] + ty / m * rb(s) * .55, p[1] - tx / m * rb(s) * .55, .013);
+  // 一条肢体（两段）；near = 近侧（亮一些、在身体上投下柔和阴影）
+  const seg2 = (A, B, C, rA, rB, rC, b1, b2, col, near, extra) => {
+    const a = fx_segPts(A, B, rA, rB, b1[0], b1[1]).map(toW), b = fx_segPts(B, C, rB, rC, b2[0], b2[1]).map(toW);
+    all.push(...a, ...b);
+    const pa = fx_path(a, true), pb = fx_path(b, true), Aw = toW(A), Bw = toW(B), Cw = toW(C), ta = px(rA + rB), tb = px(rB + rC);
+    if (near) {
+      // 整条肢体投在身体上的影子
+      const u = new Path2D(); u.addPath(pa); u.addPath(pb); if (extra) u.addPath(extra);
+      fx_lowPrep(W, H); fx_lowCast(u, ta * .45, ta * .12, .3); fx_lowFlush(L, fx_bb([...a, ...b], ta * 1.2), null);
     }
-    L.fill();
-  }
-  const hg = 1 - smooth(100, 170, d), bpm = heartRate(d);
-  if (hg > 0) {
-    const p = bez(sp, .3), b = pulse(t, bpm), x = p[0] - rb(.3) * .35;
-    const g = L.createRadialGradient(x, p[1], 0, x, p[1], .07);
-    g.addColorStop(0, `rgba(255,60,85,${(.45 + .35 * b) * hg})`); g.addColorStop(1, "rgba(255,60,85,0)");
-    L.fillStyle = g; L.beginPath(); circ(L, x, p[1], .07); L.fill();
-  }
-  const dark = "rgba(85,30,40,.7)";
-  const eye = f(-.5, .06), blink = (t % 7) < .18;
-  if (d < 84) { L.fillStyle = `rgba(45,15,25,${.85 * (1 - smooth(74, 84, d))})`; L.beginPath(); circ(L, ...eye, .14 * hr); L.fill(); }
-  if (d >= 74 && (d < 182 || blink)) {
-    L.strokeStyle = dark; L.lineWidth = hr * .045;
-    L.beginPath(); L.arc(eye[0], eye[1] - .03 * hr, .13 * hr, .2 * Math.PI + nod, .85 * Math.PI + nod); L.stroke();
-  } else if (d >= 182) {
-    L.fillStyle = "rgba(40,22,30,.92)"; blob(L, eye, .12 * hr, .09 * hr, nod);
-    L.fillStyle = "rgba(255,255,255,.75)"; L.beginPath(); circ(L, eye[0] - .04 * hr, eye[1] - .03 * hr, .028 * hr); L.fill();
-  }
-  if (d > 150) {
-    const bw = f(-.52, -.12); L.strokeStyle = `rgba(110,60,50,${.35 * smooth(150, 220, d)})`; L.lineWidth = hr * .035;
-    L.beginPath(); L.arc(bw[0], bw[1] + .12 * hr, .17 * hr, 1.15 * Math.PI + nod, 1.75 * Math.PI + nod); L.stroke();
-  }
-  const ear = f(.16, lerp(.5, .14, smooth(56, 126, d)));
-  L.strokeStyle = `rgba(150,70,75,.6)`; L.lineWidth = hr * .07;
-  L.beginPath(); L.arc(ear[0], ear[1], .19 * hr, -1.35 + nod, 1.7 + nod); L.stroke();
-  L.lineWidth = hr * .035; L.beginPath(); L.arc(ear[0] - .02 * hr, ear[1] + .01 * hr, .09 * hr, -1 + nod, 1.4 + nod); L.stroke();
-  L.fillStyle = dark; L.beginPath(); circ(L, ...f(-.92, .36), .025 * hr); L.fill();
-  const mo = f(-.78, .6); L.strokeStyle = dark; L.lineWidth = hr * .035;
-  L.beginPath(); L.moveTo(mo[0] - .06 * hr, mo[1]); L.quadraticCurveTo(mo[0], mo[1] + .03 * hr, mo[0] + .07 * hr, mo[1] - .01 * hr); L.stroke();
-  const nh = Math.floor(34 * smooth(140, 265, d));
-  if (nh) {
-    const hrng = rng(17); L.strokeStyle = `rgba(80,45,35,${lerp(.35, .6, smooth(180, 265, d))})`; L.lineWidth = hr * .025;
-    L.beginPath();
-    for (let i = 0; i < nh; i++) {
-      const a = lerp(-2.7, -.15, hrng()) + nod, l = hr * (.05 + hrng() * .07);
-      const x0 = Hc[0] + Math.cos(a) * hr * .96, y0 = Hc[1] + Math.sin(a) * hr * .96;
-      L.moveTo(x0, y0); L.quadraticCurveTo(x0 + Math.cos(a + .5) * l, y0 + Math.sin(a + .5) * l, x0 + Math.cos(a + .25) * l * 1.6, y0 + Math.sin(a + .25) * l * 1.6);
+    fx_cyl(L, pa, Aw, Bw, px(Math.max(rA, rB) + Math.max(b1[0], b1[1]) * .7), lit(col, fx_lerp2(Aw, Bw, .5)), near ? .5 : .3);
+    if (near) { fx_lowPrep(W, H); fx_lowCast(pb, tb * .35, tb * .1, .3); fx_lowFlush(L, fx_bb(a, 2), pa); }  // 小腿/前臂压在大腿/上臂上的影子
+    fx_cyl(L, pb, Bw, Cw, px(Math.max(rB, rC) + Math.max(b2[0], b2[1]) * .7), lit(col, fx_lerp2(Bw, Cw, .5)), near ? .5 : .3);
+  };
+  const drawArm = (A, col, near) => {
+    seg2(A.S, A.E, A.W, A.rS, A.rE, A.rW, [.012, .01], [.01, .008], col, near);
+    if (near) {
+      // 肩头与身体之间柔和过渡，不像一根管子插在身上
+      const Sw = toW(A.S), ud = dW(fx_nrm(fx_sub(A.S, A.E))), c0 = fx_add(Sw, ud, px(A.rS) * .35), r = px(A.rS) * 1.5;
+      const g = L.createRadialGradient(c0[0], c0[1], 0, c0[0], c0[1], r);
+      g.addColorStop(0, rgb(skin, .85)); g.addColorStop(.55, rgb(skin, .5)); g.addColorStop(1, rgb(skin, 0));
+      L.save(); L.clip(bodyPath); L.fillStyle = g; L.fillRect(c0[0] - r, c0[1] - r, r * 2, r * 2); L.restore();
     }
-    L.stroke();
-  }
-  L.restore();
-  flushLayer(c, lerp(.88, 1, u));
+    const Wp = toW(A.W), dir = dW(A.hd), n = [dir[1], -dir[0]];
+    all.push(...fx_hand(L, Wp, dir, n, px(A.hl), px(A.rW), lit(mix(col, [255, 240, 230], .04), Wp), near ? edge : rgb(mix(col, [140, 60, 80], .4), .45)));
+    // 足月前后手腕上的肉褶
+    const cr = smooth(200, 260, d) * (near ? .32 : .2);
+    if (cr > 0) {
+      const rw = px(A.rW), a = fx_add(Wp, n, rw * .85), b = fx_add(Wp, n, -rw * .85), m = fx_add(fx_add(Wp, dir, -rw * .35), n, 0);
+      L.strokeStyle = `rgba(165,84,98,${cr})`; L.lineWidth = Math.max(.7, rw * .14);
+      L.beginPath(); L.moveTo(a[0], a[1]); L.quadraticCurveTo(m[0], m[1], b[0], b[1]); L.stroke();
+    }
+  };
+  const drawLeg = (G, col, near) => {
+    const q = P.pl;
+    const shin = fx_nrm(fx_sub(G.A, G.K)), dirT = dW(fx_rot(shin, 1.85 + G.flex)), sole = dW(fx_rot(shin, .35 + G.flex * .5));
+    const A = toW(G.A), fl = px(G.fl), ra = px(G.rA);
+    const fp = fx_footPts(dirT, sole, A, fl, ra), path = fx_path(fp, true);
+    all.push(...fp);
+    seg2(G.H, G.K, G.A, G.rH, G.rK, G.rA, [.012 + .025 * q, .01 + .015 * q], [.004, .012 + .01 * q], col, near, path);
+    const fcol = lit(col, A);
+    fx_cyl(L, path, fx_add(A, sole, -ra), fx_add(fx_add(A, sole, -ra), dirT, fl), ra * 1.25, fcol, near ? .45 : .25);
+    // 脚踝前的肉褶
+    const cr = smooth(200, 260, d) * (near ? .3 : .18);
+    if (cr > 0) {
+      const a = fx_add(fx_add(A, dirT, ra * .55), sole, -ra * .85), b = fx_add(fx_add(A, dirT, ra * .95), sole, ra * .1), m = fx_add(fx_add(A, dirT, ra * .55), sole, -ra * .25);
+      L.strokeStyle = `rgba(165,84,98,${cr})`; L.lineWidth = Math.max(.7, ra * .13);
+      L.beginPath(); L.moveTo(a[0], a[1]); L.quadraticCurveTo(m[0], m[1], b[0], b[1]); L.stroke();
+    }
+    fx_toes(L, dirT, sole, A, fl, ra, fcol, rgb(mix(fcol, [150, 66, 84], .45), near ? .3 : .2));
+  };
 
-  return seriesAt(CRL, d, true) * 10 / (Lp * lerp(1.19, 1.01, u));
+  // 远侧手脚（在身体后面，稍暗）
+  drawArm(P.armF, far, false);
+  drawLeg(P.legF, far, false);
+
+  // 身体：头、颈、背、臀、腹一体的轮廓
+  const bw = P.body.map(toW), body = fx_path(bw, true), bbb = fx_bb(bw, 0), hrp = px(P.hr);
+  bodyPath = body;
+  all.push(...bw);
+  {
+    const [x0, y0, x1, y1] = bbb, sz = Math.max(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    const g = L.createRadialGradient(mx + fx_LT[0] * sz * .22, my + fx_LT[1] * sz * .22, 0, mx, my, sz * .62);
+    g.addColorStop(0, rgb(mix(skin, [255, 246, 238], .26))); g.addColorStop(.5, rgb(skin)); g.addColorStop(1, rgb(mix(skin, [170, 82, 100], .24)));
+    L.fillStyle = g; L.fill(body);
+  }
+  fx_lowPrep(W, H);
+  fx_lowInner(body, bbb, "rgba(140,52,70,.42)", px(.17), px(.07));
+  fx_lowInner(body, bbb, "rgba(255,228,220,.45)", px(.035), px(.025));
+  fx_lowFlush(L, bbb, body);
+  {
+    L.save(); L.globalCompositeOperation = "source-atop";
+    // 额头和头顶的柔光、脸颊红晕
+    const hc = hW(-.3, -.35);
+    let g = L.createRadialGradient(hc[0], hc[1], 0, hc[0], hc[1], hrp * 1.05);
+    g.addColorStop(0, "rgba(255,246,238,.32)"); g.addColorStop(1, "rgba(255,246,238,0)");
+    L.fillStyle = g; L.fillRect(hc[0] - hrp * 1.1, hc[1] - hrp * 1.1, hrp * 2.2, hrp * 2.2);
+    // 后期脸颊鼓起来：一块柔和的高光
+    const chk = hW(-.52, .46), chr = hrp * .3;
+    g = L.createRadialGradient(chk[0], chk[1], 0, chk[0], chk[1], chr);
+    g.addColorStop(0, `rgba(255,242,234,${.2 * P.pl})`); g.addColorStop(1, "rgba(255,242,234,0)");
+    L.fillStyle = g; L.fillRect(chk[0] - chr, chk[1] - chr, chr * 2, chr * 2);
+    const ck = hW(-.6, .6), cr = hrp * .38;
+    g = L.createRadialGradient(ck[0], ck[1], 0, ck[0], ck[1], cr);
+    g.addColorStop(0, `rgba(238,128,128,${lerp(.12, .26, P.pl)})`); g.addColorStop(1, "rgba(238,128,128,0)");
+    L.fillStyle = g; L.fillRect(ck[0] - cr, ck[1] - cr, cr * 2, cr * 2);
+    // 早期透出的心跳微光（柔和的玫瑰色，逐渐消失）
+    const hg = 1 - smooth(84, 120, d);
+    if (hg > 0) {
+      const hp = toW(P.heart), b = pulse(t, heartRate(d)), r = px(.14);
+      g = L.createRadialGradient(hp[0], hp[1], 0, hp[0], hp[1], r);
+      g.addColorStop(0, `rgba(255,120,130,${(.2 + .18 * b) * hg})`); g.addColorStop(1, "rgba(255,120,130,0)");
+      L.fillStyle = g; L.fillRect(hp[0] - r, hp[1] - r, r * 2, r * 2);
+    }
+    // 头发：后期头顶、枕部一层很淡的软发
+    const ha = .14 * smooth(135, 185, d) + .34 * smooth(185, 272, d);
+    if (ha > .01) {
+      const hcn = hW(.03, -.03), a0 = P.hA + ang - 2.25, a1 = P.hA + ang + .3;
+      g = L.createRadialGradient(hcn[0], hcn[1], hrp * .78, hcn[0], hcn[1], hrp * 1.08);
+      g.addColorStop(.2, "rgba(112,72,56,0)"); g.addColorStop(.57, `rgba(112,72,56,${ha * .8})`); g.addColorStop(.74, `rgba(112,72,56,${ha})`); g.addColorStop(1, "rgba(112,72,56,0)");
+      // 发际线两端逐渐变淡：主扇形 + 两头各几片越来越淡的小扇形
+      L.fillStyle = g; L.beginPath(); L.moveTo(hcn[0], hcn[1]); L.arc(hcn[0], hcn[1], hrp * 1.08, a0 + .4, a1 - .3); L.closePath(); L.fill();
+      for (let k = 0; k < 5; k++) {
+        L.globalAlpha = 1 - (k + .5) / 5;
+        L.beginPath(); L.moveTo(hcn[0], hcn[1]); L.arc(hcn[0], hcn[1], hrp * 1.08, a0 + .4 - (k + 1) * .08, a0 + .4 - k * .08); L.closePath(); L.fill();
+        L.beginPath(); L.moveTo(hcn[0], hcn[1]); L.arc(hcn[0], hcn[1], hrp * 1.08, a1 - .3 + k * .06, a1 - .3 + (k + 1) * .06); L.closePath(); L.fill();
+      }
+      L.globalAlpha = 1;
+      // 细软的发丝，顺着头皮往后脑勺方向倒
+      const hrg = rng(31); L.strokeStyle = `rgba(98,62,48,${ha * .75})`; L.lineWidth = Math.max(.5, hrp * .015); L.beginPath();
+      for (let i = 0; i < 70; i++) {
+        const a = lerp(a0 + .25, a1 - .12, hrg()), r0 = hrp * (.9 + .09 * hrg()), l = hrp * (.06 + .05 * hrg());
+        const x0 = hcn[0] + Math.cos(a) * r0, y0 = hcn[1] + Math.sin(a) * r0;
+        L.moveTo(x0, y0); L.quadraticCurveTo(x0 + Math.cos(a + 1.5) * l, y0 + Math.sin(a + 1.5) * l, x0 + Math.cos(a + 1.85) * l * 1.7, y0 + Math.sin(a + 1.85) * l * 1.7);
+      }
+      L.stroke();
+    }
+    L.restore();
+  }
+  // 五官
+  {
+    const lw = Math.max(.8, hrp * .032), mf = smooth(60, 240, d);
+    // 闭着的眼睛：一条向下弯的柔和眼睑线 + 眼球隆起的高光
+    const ex = P.eye[0], ey = P.eye[1];
+    const e0 = hW(ex - .13, ey - .01), e1 = hW(ex, ey + .07), e2 = hW(ex + .13, ey + .02), eh = hW(ex - .01, ey - .06);
+    let g = L.createRadialGradient(eh[0], eh[1], 0, eh[0], eh[1], hrp * .17);
+    g.addColorStop(0, "rgba(255,242,234,.32)"); g.addColorStop(1, "rgba(255,242,234,0)");
+    L.fillStyle = g; L.beginPath(); circ(L, eh[0], eh[1], hrp * .17); L.fill();
+    L.strokeStyle = rgb(mix(skin, [120, 50, 64], .5), .7); L.lineWidth = lw;
+    L.beginPath(); L.moveTo(e0[0], e0[1]); L.quadraticCurveTo(e1[0], e1[1], e2[0], e2[1]); L.stroke();
+    const la = smooth(175, 230, d);
+    if (la > 0) {
+      // 睫毛：几根短短的、顺着眼睑弯向外眼角的浅棕色细毛，贴着眼睑线
+      L.strokeStyle = `rgba(128,80,74,${.34 * la})`; L.lineWidth = lw * .42; L.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const q = .34 + i * .15, u = 1 - q;
+        const lx = u * u * (ex - .13) + 2 * u * q * ex + q * q * (ex + .13), ly = u * u * (ey - .01) + 2 * u * q * (ey + .07) + q * q * (ey + .02) - .004;
+        const l = .045 + .008 * Math.sin(Math.PI * q), a = hW(lx, ly), m = hW(lx + .006 + .012 * q, ly + l * .6), b = hW(lx + .02 + .025 * q, ly + l);
+        L.moveTo(a[0], a[1]); L.quadraticCurveTo(m[0], m[1], b[0], b[1]);
+      }
+      L.stroke();
+      const b0 = hW(ex - .17, ey - .2), b1 = hW(ex, ey - .27), b2 = hW(ex + .15, ey - .22);
+      L.strokeStyle = `rgba(150,98,80,${.25 * la})`; L.lineWidth = lw * 1.4;
+      L.beginPath(); L.moveTo(b0[0], b0[1]); L.quadraticCurveTo(b1[0], b1[1], b2[0], b2[1]); L.stroke();
+    }
+    // 鼻翼、嘴
+    const ns = hW(lerp(-.86, -.93, mf), lerp(.56, .5, mf)), ns2 = hW(lerp(-.8, -.84, mf), lerp(.53, .45, mf));
+    L.strokeStyle = rgb(mix(skin, [130, 54, 70], .45), .45); L.lineWidth = lw * .9;
+    L.beginPath(); L.moveTo(ns[0], ns[1]); L.quadraticCurveTo(...hW(lerp(-.8, -.82, mf), lerp(.58, .53, mf)), ns2[0], ns2[1]); L.stroke();
+    const m0 = hW(lerp(-.79, -.87, mf), lerp(.73, .7, mf)), m1 = hW(lerp(-.7, -.74, mf), lerp(.75, .72, mf)), m2 = hW(lerp(-.63, -.67, mf), lerp(.72, .68, mf));
+    L.strokeStyle = rgb(mix(skin, [140, 52, 70], .5), .55); L.lineWidth = lw;
+    L.beginPath(); L.moveTo(m0[0], m0[1]); L.quadraticCurveTo(m1[0], m1[1], m2[0], m2[1]); L.stroke();
+    const lp = hW(lerp(-.78, -.86, mf), lerp(.72, .7, mf));
+    g = L.createRadialGradient(lp[0], lp[1], 0, lp[0], lp[1], hrp * .14);
+    g.addColorStop(0, "rgba(232,122,130,.28)"); g.addColorStop(1, "rgba(232,122,130,0)");
+    L.fillStyle = g; L.beginPath(); circ(L, lp[0], lp[1], hrp * .14); L.fill();
+    // 耳朵：外耳轮 + 对耳轮 + 耳甲腔 + 耳垂
+    const Ep = P.ear, es = lerp(.26, .34, smooth(56, 140, d));
+    const er = (x, y) => { const v = fx_rot([x * es, y * es], .22); return hW(Ep[0] + v[0], Ep[1] + v[1]); };
+    const ear = [er(-.1, -.48), er(.12, -.5), er(.3, -.3), er(.33, 0), er(.24, .3), er(.1, .5), er(-.05, .48), er(-.12, .3), er(-.16, 0), er(-.18, -.3)];
+    const ep = fx_path(ear, true);
+    L.fillStyle = rgb(mix(skin, [210, 124, 130], .18)); L.fill(ep);
+    L.save(); L.clip(ep);
+    L.strokeStyle = rgb(mix(skin, [255, 242, 234], .4), .7); L.lineWidth = lw * 1.4; L.stroke(ep);
+    L.restore();
+    L.strokeStyle = rgb(mix(skin, [150, 66, 80], .4), .3); L.lineWidth = lw * .8; L.stroke(ep);
+    const ah = fx_path([er(-.02, -.3), er(.15, -.18), er(.18, .08), er(.06, .28)], false);
+    L.strokeStyle = rgb(mix(skin, [140, 60, 74], .45), .42); L.lineWidth = lw; L.stroke(ah);
+    const cc = er(.02, .05); g = L.createRadialGradient(cc[0], cc[1], 0, cc[0], cc[1], es * hrp * .22);
+    g.addColorStop(0, "rgba(150,64,78,.26)"); g.addColorStop(1, "rgba(150,64,78,0)");
+    L.fillStyle = g; L.beginPath(); circ(L, cc[0], cc[1], es * hrp * .22); L.fill();
+  }
+
+  // 脐带：先在身体上投一道柔影，再画脐带本身（胎盘一端裁在胎盘表面），最后用一圈皮肤盖住肚脐处的根部
+  {   // 柔影：两道由宽到窄、很淡的描边（离开肚脐一小段再开始、两头圆），只落在已经画好的身体上
+    const sp = new Path2D();
+    for (let i = 0; i <= 24; i++) { const q = bez(cordPts, .05 + .95 * i / 24); i ? sp.lineTo(q[0], q[1]) : sp.moveTo(q[0], q[1]); }
+    L.save(); L.globalCompositeOperation = "source-atop"; L.translate(cw * .35, cw * .45); L.lineCap = "round"; L.lineJoin = "round";
+    L.lineWidth = cw * 1.9; L.strokeStyle = "rgba(112,36,54,.06)"; L.stroke(sp);
+    L.lineWidth = cw * 1.3; L.strokeStyle = "rgba(112,36,54,.1)"; L.stroke(sp);
+    L.restore();
+  }
+  L.save(); L.beginPath(); circ(L, cx, cy, R - plTh * .985); L.clip();
+  fx_cord(L, cord, cordPts, cw, t, 1);
+  L.restore();
+  {
+    // 脐轮：一团边缘柔和的皮肤包住脐带根部（没有直边），顺着脐带方向略长
+    const u = fx_nrm(fx_sub(bez(cordPts, .05), nv)), c0 = fx_add(nv, u, cw * .2), cs = mix(lit(skin, nv), [176, 90, 104], .2);
+    L.save(); L.translate(c0[0], c0[1]); L.rotate(Math.atan2(u[1], u[0])); L.scale(1.15, 1);
+    const g = L.createRadialGradient(0, 0, 0, 0, 0, cw * .8);
+    g.addColorStop(0, rgb(cs)); g.addColorStop(.62, rgb(cs, .92)); g.addColorStop(1, rgb(cs, 0));
+    L.fillStyle = g; L.beginPath(); circ(L, 0, 0, cw * .8); L.fill(); L.restore();
+  }
+
+  // 近侧手脚
+  drawLeg(P.legN, skin, true);
+  drawArm(P.armN, skin, true);
+
+  // 羊膜（到第 14 周左右与绒毛膜贴合、看不出来）和卵黄囊（第 12 周左右消失）：接着胚胎期的位置画，慢慢淡去
+  if (d < 100) {
+    const Fa = F || em_frame(cx, cy, R, 60.9, t), k = smooth(59, 95, d);
+    em_amnion(c, fx_lerp2(Fa.amC, [cx, cy], k), lerp(Fa.amCl, R * .985, k), R, 1 - smooth(72, 100, d));
+    if (d < 84) em_yolk(c, Fa.ys, R * fx_k(d, [[56, .075], [70, .06], [84, .05]]), nv, 1 - smooth(66, 84, d), R, d);
+  }
+  // 合成到画面（只处理胎儿所在区域）
+  const fb = fx_bb(all, px(.2) + 6), X0 = Math.max(0, fb[0]), Y0 = Math.max(0, fb[1]), X1 = Math.min(W, fb[2]), Y1 = Math.min(H, fb[3]);
+  if (X1 > X0 && Y1 > Y0) {
+    const a = Math.floor(X0 * DPR), b = Math.floor(Y0 * DPR), w = Math.min(layerCv.width - a, Math.ceil((X1 - X0) * DPR) + 2), h = Math.min(layerCv.height - b, Math.ceil((Y1 - Y0) * DPR) + 2);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = lerp(.88, 1, smooth(56, 160, d));
+    c.drawImage(layerCv, a, b, w, h, a, b, w, h); c.restore();
+  }
+
+  const rp = toW(rest.rump);
+  let crl = 0; for (let i = 0; i < P.nHead; i++) crl = Math.max(crl, fx_len(fx_sub(toW(rest.body[i]), rp)));
+  const own = seriesAt(CRL, d, true) * 10 / crl;
+  return F ? Math.exp(lerp(Math.log(F.mm), Math.log(own), hb)) : own;
 }
 
 // ---------- 妈妈侧影：肚子和子宫随孕周变大 ----------
+// 画布 300×400，人朝右站，约 3.4 px/cm；耻骨联合上缘在 y≈274，肚脐 y≈220，剑突 y≈164。
+// 子宫是一个“倒梨形”，以宫颈为支点：早期前倾、躺在骨盆里，长大后逐渐竖起；
+// 肚皮轮廓 = 孕前轮廓与子宫前壁（加一层腹壁）取较大者，再纵向柔化，所以隆起的形状总是跟子宫一致。
 const momCv = document.getElementById("momCv"), mctx = momCv.getContext("2d");
 function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-function fundusHeight(d) {
-  if (d < 84) return lerp(22, 32, smooth(28, 84, d));
-  if (d < 140) return lerp(32, 68, smooth(84, 140, d));
-  if (d < 252) return lerp(68, 118, (d - 140) / 112);
-  return lerp(118, 110, smooth(252, 280, d));
+function env_hex(s, fb) {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((s || "").trim());
+  if (!m) return fb;
+  let h = m[1]; if (h.length === 3) h = h.split("").map(x => x + x).join("");
+  return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
 }
+// 按孕周插值的表：[周, 值]
+function env_tab(tb, w) {
+  if (w <= tb[0][0]) return tb[0][1];
+  for (let i = 1; i < tb.length; i++) if (w <= tb[i][0]) {
+    const [w0, v0] = tb[i - 1], [w1, v1] = tb[i], q = (w - w0) / (w1 - w0);
+    return lerp(v0, v1, q * q * (3 - 2 * q));
+  }
+  return tb[tb.length - 1][1];
+}
+// 子宫几何（px）：长轴长度、前后径、前倾角（度，0 = 竖直）
+const env_UL = [[0, 24], [4, 25], [6, 27], [8, 31], [10, 36], [12, 41], [14, 48], [16, 56], [20, 76], [24, 88], [28, 98], [32, 114], [36, 128], [38, 131], [40, 124]];
+const env_UW = [[0, 15], [4, 16], [6, 19], [8, 24], [10, 28], [12, 32], [14, 38], [16, 45], [20, 58], [24, 67], [28, 75], [32, 83], [36, 89], [40, 92]];
+const env_UA = [[0, 72], [5, 70], [8, 62], [12, 48], [16, 32], [20, 24], [28, 20], [36, 17], [38, 18], [40, 23]];
+const env_PUB = 274;
+// 宫颈位置：早期子宫在盆腔正中、膀胱后面；长大后宫体整体前移贴着腹壁，足月入盆时略下降
+const env_cervix = d => [lerp(134, 152, smooth(70, 180, d)), lerp(284, 288, smooth(70, 180, d)) + 3 * smooth(259, 280, d)];
+function env_uterus(d) {
+  const w = d / 7, L = env_tab(env_UL, w), Wd = env_tab(env_UW, w), phi = env_tab(env_UA, w) * Math.PI / 180;
+  const ax = [Math.sin(phi), -Math.cos(phi)], nx = [Math.cos(phi), Math.sin(phi)];
+  const C = env_cervix(d);
+  const ctr = [C[0] + ax[0] * L / 2, C[1] + ax[1] * L / 2], pts = [];
+  // 倒梨形：宫底宽、宫颈窄；前壁比后壁更鼓（后面贴着脊柱）
+  for (let i = 0; i < 64; i++) {
+    const th = i / 64 * TAU, along = Math.cos(th) * L / 2, sn = Math.sin(th);
+    const across = sn * Wd / 2 * (1 + .24 * Math.cos(th)) * (sn > 0 ? 1.16 : .8) * (Math.cos(th) < -.6 ? lerp(1, .8, (-.6 - Math.cos(th)) / .4) : 1);
+    pts.push([ctr[0] + ax[0] * along + nx[0] * across, ctr[1] + ax[1] * along + nx[1] * across]);
+  }
+  let top = pts[0];
+  for (const p of pts) if (p[1] < top[1]) top = p;
+  return { pts, top, ctr, ax, nx, L, Wd, phi };
+}
+function fundusHeight(d) { return env_PUB - env_uterus(d).top[1]; }
+
+// 曲线插值（Catmull-Rom，按 y 单调）
+function env_cr(tb, y) {
+  let i = 1; while (i < tb.length - 1 && y > tb[i][0]) i++;
+  const p0 = tb[Math.max(0, i - 2)], p1 = tb[i - 1], p2 = tb[i], p3 = tb[Math.min(tb.length - 1, i + 1)];
+  const t = clamp((y - p1[0]) / (p2[0] - p1[0]), 0, 1), t2 = t * t, t3 = t2 * t;
+  return .5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+}
+
 function drawMom(d) {
   const c = mctx, dpr = Math.min(window.devicePixelRatio || 1, 2);
   if (momCv.width !== 300 * dpr) { momCv.width = 300 * dpr; momCv.height = 400 * dpr; }
   c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, 300, 400);
-  const ink = cssVar("--muted"), fill = cssVar("--surface"), acc = cssVar("--accent");
-  const B = smooth(84, 266, d) * (1 - .06 * smooth(259, 280, d));
-  c.lineJoin = "round"; c.lineWidth = 2;
-  c.beginPath();
-  c.moveTo(138, 74);
-  c.bezierCurveTo(130, 86, 116, 98, 118, 120);
-  c.bezierCurveTo(120, 150, 128 + 8 * B, 180, 122 + 6 * B, 210);
-  c.bezierCurveTo(108, 225, 104, 250, 116, 275);
-  c.bezierCurveTo(126, 300, 122, 350, 124, 396);
-  c.lineTo(176, 396);
-  c.bezierCurveTo(180, 360, 184, 320, 180, 290);
-  c.bezierCurveTo(180 + 72 * B, 286 - 8 * B, 184 + 82 * B, 186, 172, 168);
-  c.bezierCurveTo(188 + 6 * B, 160, 194 + 6 * B, 120, 168, 112);
-  c.bezierCurveTo(160, 104, 158, 96, 160, 82);
-  c.closePath();
-  c.fillStyle = fill; c.fill(); c.strokeStyle = ink; c.stroke();
-  c.beginPath(); circ(c, 152, 48, 26); c.fill(); c.stroke();
-  c.beginPath(); c.moveTo(140, 106); c.bezierCurveTo(138, 150, 142, 180, 150, 214); c.globalAlpha = .45; c.stroke(); c.globalAlpha = 1;
+  // 主题色
+  const surf = env_hex(cssVar("--surface"), [255, 255, 255]), bg = env_hex(cssVar("--surface-2"), [242, 233, 236]);
+  const ink = env_hex(cssVar("--ink"), [42, 26, 36]), mut = env_hex(cssVar("--muted"), [117, 96, 108]);
+  const acc = env_hex(cssVar("--accent"), [176, 56, 95]), soft = env_hex(cssVar("--accent-soft"), [247, 223, 231]);
+  const darkUI = (ink[0] + ink[1] + ink[2]) > (bg[0] + bg[1] + bg[2]);
+  const fill = darkUI ? mix(bg, ink, .13) : mix(surf, soft, .45);
+  const shade = darkUI ? mix(bg, ink, .07) : mix(surf, soft, 1);
+  const line = darkUI ? mix(mut, bg, .25) : mix(mut, acc, .2);
+  const hair = darkUI ? mix(bg, mut, .55) : mix(mut, ink, .25);
 
-  // 子宫与胎儿
-  const fh = fundusHeight(d), ux = 168 + 28 * B, uy = 282 - fh / 2, rx = lerp(15, 58, B) + (d < 84 ? smooth(28, 84, d) * 4 : 4), ry = fh / 2;
-  c.beginPath(); c.ellipse(ux, uy, rx, ry, -.08 * B, 0, TAU);
-  c.globalAlpha = .22; c.fillStyle = acc; c.fill(); c.globalAlpha = 1;
-  c.strokeStyle = acc; c.lineWidth = 1.5; c.stroke();
-  if (d >= 28) {
-    const sc = d < 56 ? .25 + .25 * smooth(28, 56, d) : lerp(.45, .95, smooth(56, 280, d));
-    const up = smooth(196, 245, d) > .5 ? 1 : -1, hrad = ry * .32 * sc + 1.5;
-    c.fillStyle = acc; c.globalAlpha = .75;
-    c.beginPath(); c.ellipse(ux + 2, uy + up * ry * .12 * sc, rx * .42 * sc + 1.5, ry * .42 * sc + 1.5, 0, 0, TAU); c.fill();
-    if (d >= 50) { c.beginPath(); circ(c, ux - 2, uy - up * ry * .42 * sc, hrad); c.fill(); }
+  const w = d / 7, U = env_uterus(d);
+  const B = smooth(84, 266, d);                         // 孕中晚期整体变化
+  const bs = 5 * smooth(30, 200, d);                    // 乳房略增大
+  const lord = 4 * smooth(120, 270, d), hip = 3 * smooth(60, 270, d);
+  // 孕前的正面轮廓（y → x）
+  const front0 = [[100, 160], [112, 164], [128, 172], [144, 180 + bs], [156, 177 + bs * .7], [164, 168], [178, 166], [198, 167], [220, 169], [244, 172], [262, 171], [276, 166], [290, 162], [312, 166], [352, 165], [404, 158]];
+  const back = [[96, 124], [112, 112], [132, 106], [160, 107], [188, 113], [210, 118 + lord], [234, 112 + lord * .4], [256, 102 - hip * .5], [272, 98 - hip], [290, 102 - hip * .6], [302, 109], [334, 114 - hip * .4], [368, 118], [404, 124]];
+  // 肚皮：孕前轮廓与子宫前壁 + 腹壁取大，再纵向柔化
+  const wall = 5 + 2 * B, ys = [], fx = [];
+  const segX = y => {           // 子宫轮廓在 y 处的最前点
+    let best = -1e9; const P = U.pts;
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length];
+      if ((a[1] - y) * (b[1] - y) <= 0 && a[1] !== b[1]) best = Math.max(best, a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]));
+    }
+    return best;
+  };
+  for (let y = 100; y <= 404; y += 2) { ys.push(y); fx.push(Math.max(env_cr(front0, y), segX(y) + wall)); }
+  const sm = fx.map((v, i) => {
+    let s = 0, n = 0;
+    for (let k = -7; k <= 7; k++) { const j = clamp(i + k, 0, fx.length - 1), g = Math.exp(-k * k / 18); s += fx[j] * g; n += g; }
+    return Math.max(v, s / n);
+  });
+  const frontAt = y => { const i = clamp((y - 100) / 2, 0, ys.length - 1), i0 = Math.floor(i), i1 = Math.min(ys.length - 1, i0 + 1); return lerp(sm[i0], sm[i1], i - i0); };
+
+  // ---- 轮廓：头、颈、躯干、腿（一条闭合路径，没有接缝） ----
+  const body = new Path2D();
+  body.moveTo(140, 13);
+  body.bezierCurveTo(153, 13, 163, 20, 166, 31);        // 额头
+  body.bezierCurveTo(168, 38, 167, 42, 166, 44);        // 眉弓、鼻根
+  body.bezierCurveTo(169, 48, 173, 52, 174, 55);        // 鼻梁到鼻尖
+  body.bezierCurveTo(173, 57, 170, 58, 168, 58);        // 鼻底
+  body.bezierCurveTo(169, 60, 169, 62, 168, 63);        // 上唇
+  body.bezierCurveTo(167, 64, 166, 64.5, 166, 65);
+  body.bezierCurveTo(168, 66, 168, 68, 166, 70);        // 下唇
+  body.bezierCurveTo(165, 72, 166, 75, 163, 78);        // 下巴
+  body.bezierCurveTo(160, 81, 155, 82, 152, 83);        // 下颌
+  body.bezierCurveTo(152, 89, 154, 95, 158, 100);       // 颈前
+  for (let i = 0; i < ys.length; i++) body.lineTo(sm[i], ys[i]);
+  body.lineTo(env_cr(back, 404), 404);
+  for (let y = 402; y >= 96; y -= 2) body.lineTo(env_cr(back, y), y);
+  body.bezierCurveTo(122, 90, 124, 84, 122, 78);        // 后颈
+  body.bezierCurveTo(112, 72, 108, 60, 110, 44);        // 后脑
+  body.bezierCurveTo(112, 26, 124, 13, 140, 13);
+  body.closePath();
+  c.lineJoin = "round"; c.lineCap = "round";
+  c.fillStyle = rgb(fill); c.fill(body);
+  // 背侧一层很淡的阴影，给身体一点体积
+  c.save(); c.clip(body);
+  const vg = c.createLinearGradient(90, 0, 200, 0);
+  vg.addColorStop(0, rgb(darkUI ? mix(bg, [0, 0, 0], .15) : mix(shade, mut, .18), .9)); vg.addColorStop(.45, rgb(fill, 0));
+  c.fillStyle = vg; c.fillRect(0, 0, 300, 400);
+  c.restore();
+  c.lineWidth = 2.2; c.strokeStyle = rgb(line); c.stroke(body);
+
+  // 头发：低低挽起的发髻
+  c.fillStyle = rgb(hair);
+  c.beginPath();
+  c.moveTo(163, 25);
+  c.bezierCurveTo(158, 13, 146, 9, 134, 11);
+  c.bezierCurveTo(118, 14, 106, 27, 106, 46);
+  c.bezierCurveTo(106, 60, 112, 70, 121, 77);
+  c.bezierCurveTo(124, 68, 125, 58, 132, 50);
+  c.bezierCurveTo(138, 40, 146, 34, 154, 31);
+  c.bezierCurveTo(158, 29, 161, 28, 163, 25);
+  c.closePath(); c.fill();
+  c.beginPath(); c.ellipse(106, 70, 13, 11, -.5, 0, TAU); c.fill();
+  // 闭着的眼睛、耳朵的一点暗示
+  c.strokeStyle = rgb(line); c.lineWidth = 1.8;
+  c.beginPath(); c.moveTo(154, 45); c.quadraticCurveTo(158, 48, 162, 45.5); c.stroke();
+  c.lineWidth = 1.5; c.beginPath(); c.arc(133, 54, 5.5, -1.2, 1.9); c.stroke();
+
+  // ---- 子宫（透视示意）与里面的宝宝 ----
+  const up = new Path2D();
+  U.pts.forEach((p, i) => i ? up.lineTo(p[0], p[1]) : up.moveTo(p[0], p[1])); up.closePath();
+  const ag = c.createRadialGradient(U.ctr[0] - U.Wd * .15, U.ctr[1] - U.L * .2, 2, U.ctr[0], U.ctr[1], U.L * .62);
+  ag.addColorStop(0, rgb(acc, darkUI ? .22 : .12)); ag.addColorStop(1, rgb(acc, darkUI ? .34 : .24));
+  c.fillStyle = ag; c.fill(up);
+  c.lineWidth = 2.4; c.strokeStyle = rgb(acc, .85); c.stroke(up);
+  // 宫颈的小口
+  c.lineWidth = 2.4; c.beginPath();
+  const [cx0, cy0] = env_cervix(d);
+  c.moveTo(cx0 - U.ax[0] * 2, cy0 - U.ax[1] * 2); c.lineTo(cx0 - U.ax[0] * 9, cy0 - U.ax[1] * 9); c.stroke();
+
+  const baby = darkUI ? mix(acc, ink, .3) : mix(acc, [255, 255, 255], .3);
+  c.save(); c.clip(up);
+  if (d >= 24 && d < 63) {
+    // 孕囊与小小的胚胎
+    const g = smooth(24, 60, d), sr = lerp(3, U.Wd * .36, g), sc = [U.ctr[0] + U.ax[0] * U.L * .12, U.ctr[1] + U.ax[1] * U.L * .12];
+    c.globalAlpha = 1 - smooth(56, 63, d);
+    c.fillStyle = rgb(soft, darkUI ? .25 : .9); c.strokeStyle = rgb(acc, .6); c.lineWidth = 1.5;
+    c.beginPath(); circ(c, sc[0], sc[1], sr); c.fill(); c.stroke();
+    if (d >= 32) {
+      const er = sr * .55 * smooth(32, 50, d); c.fillStyle = rgb(baby, .9);
+      c.beginPath(); c.arc(sc[0], sc[1], er, -2.4, 1.6); c.lineWidth = er * .55; c.strokeStyle = rgb(baby, .9); c.stroke();
+      c.beginPath(); circ(c, sc[0] + Math.cos(-2.4) * er, sc[1] + Math.sin(-2.4) * er, er * .42); c.fill();
+    }
     c.globalAlpha = 1;
   }
-  // 宫底刻度
-  c.setLineDash([3, 3]); c.strokeStyle = ink; c.lineWidth = 1;
-  c.beginPath(); c.moveTo(ux - 4, 282 - fh); c.lineTo(286, 282 - fh); c.stroke(); c.setLineDash([]);
-  c.fillStyle = ink; c.font = '13px "Noto Sans SC", sans-serif'; c.textAlign = "right";
-  c.fillText("宫底", 292, 282 - fh - 5);
-  c.beginPath(); c.moveTo(250, 215); c.lineTo(286, 215); c.globalAlpha = .4; c.stroke(); c.globalAlpha = 1;
-  c.fillText("肚脐", 292, 230);
+  if (d >= 56) {
+    // 蜷着的胎儿：宝宝的大小相对子宫逐渐变大，28 周后慢慢转成头朝下
+    // 转身时宝宝横过来，子宫横向比纵向窄：转到一半时稍微缩小一点，背部不会被子宫轮廓切平
+    const turn = smooth(196, 245, d), tw = Math.sin(Math.PI * turn), f = smooth(56, 63, d), k = lerp(.58, .9, smooth(63, 266, d)) * (1 - .13 * tw);
+    const s = U.L / 2 * k, wx = U.Wd / 2 * k * 1.05;
+    const rot = Math.atan2(U.ax[1], U.ax[0]) + Math.PI / 2 + turn * Math.PI * .96;
+    // 子宫前壁比后壁鼓：宝宝的中心稍微往前（肚皮一侧）挪一点，转身时再多挪一点，正好在宫腔正中
+    const fw = U.Wd * (.04 + .06 * tw) * smooth(150, 200, d);
+    c.translate(U.ctr[0] + U.ax[0] * U.L * .02 + U.nx[0] * fw, U.ctr[1] + U.ax[1] * U.L * .02 + U.nx[1] * fw); c.rotate(rot);
+    c.globalAlpha = f;
+    // 局部坐标：y 负方向朝宫底，x 正方向朝妈妈肚皮。蜷着的侧影：大头、弓着的背、膝盖收到胸前、小手在脸旁
+    const g = Math.min(s * .95, wx * 1.3), F = (x, y) => [x * g, y * g];
+    const el = (p, x, y, rx, ry, r) => { const q = F(x, y); p.moveTo(q[0] + Math.cos(r) * rx * g, q[1] + Math.sin(r) * rx * g); p.ellipse(q[0], q[1], rx * g, ry * g, r, 0, TAU); };
+    const edge = darkUI ? mix(baby, bg, .45) : mix(baby, ink, .32), lite = darkUI ? mix(baby, ink, .06) : mix(baby, [255, 255, 255], .07);
+    const trunk = new Path2D();
+    el(trunk, -.13, .2, .45, .62, .14);                  // 弓着的背和身体
+    el(trunk, .1, -.55, .4, .38, 0);                      // 头
+    el(trunk, .5, -.5, .06, .05, 0);                      // 鼻尖的小鼓包
+    c.lineWidth = Math.max(1.4, g * .07); c.strokeStyle = rgb(edge, .8); c.stroke(trunk);
+    c.fillStyle = rgb(baby); c.fill(trunk);
+    const legs = new Path2D();
+    el(legs, .2, .3, .17, .38, -.72);                     // 大腿
+    el(legs, .44, .34, .12, .3, .12);                     // 小腿
+    el(legs, .3, .66, .12, .06, -.15);                    // 小脚
+    const arm = new Path2D();
+    el(arm, .24, -.17, .21, .08, -.3);                    // 手臂
+    el(arm, .45, -.28, .075, .075, 0);                    // 小手
+    for (const p of [legs, arm]) {
+      c.lineWidth = Math.max(1.1, g * .045); c.strokeStyle = rgb(edge, .7); c.stroke(p);
+      c.fillStyle = rgb(lite); c.fill(p);
+    }
+    // 头上一点高光
+    const hc = F(.06, -.62), hr = g * .32;
+    const hg = c.createRadialGradient(hc[0] - hr * .3, hc[1] - hr * .3, 0, hc[0], hc[1], hr);
+    hg.addColorStop(0, "rgba(255,255,255,.3)"); hg.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = hg; c.beginPath(); circ(c, hc[0], hc[1], hr); c.fill();
+    c.globalAlpha = 1;
+  }
+  c.restore();
+
+  // ---- 手臂：自然垂在身侧，微微弯曲，手搭在大腿外侧（挡在子宫示意前面） ----
+  const S = [131, 113], E = [121 - 2 * lord, 202], Wr = [125 - lord, 280], Hd = [129 - lord, 304];
+  const limb = (p, a, b, r0, r1) => {
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), n = [-Math.sin(ang), Math.cos(ang)];
+    p.moveTo(a[0] + n[0] * r0, a[1] + n[1] * r0); p.lineTo(b[0] + n[0] * r1, b[1] + n[1] * r1);
+    p.arc(b[0], b[1], r1, ang + Math.PI / 2, ang - Math.PI / 2, true);
+    p.lineTo(a[0] - n[0] * r0, a[1] - n[1] * r0);
+    p.arc(a[0], a[1], r0, ang - Math.PI / 2, ang + Math.PI / 2, true);
+    p.closePath();
+  };
+  const arm = new Path2D();
+  limb(arm, S, E, 12, 8); limb(arm, E, Wr, 8, 5.6);
+  arm.ellipse(Hd[0], Hd[1] - 6, 6.6, 15, -.08, 0, TAU);
+  c.lineWidth = 3.8; c.strokeStyle = rgb(line); c.stroke(arm);
+  c.fillStyle = rgb(fill); c.fill(arm);
+  c.save(); c.clip(arm);
+  const ag2 = c.createLinearGradient(S[0] - 14, 0, S[0] + 10, 0);
+  ag2.addColorStop(0, rgb(darkUI ? mix(bg, [0, 0, 0], .1) : mix(shade, mut, .12), .8)); ag2.addColorStop(1, rgb(fill, 0));
+  c.fillStyle = ag2; c.fillRect(0, 0, 300, 400);
+  c.restore();
+
+  // ---- 标注：肚脐、宫底 ----
+  const ny = 220 - 3 * B, nx = frontAt(ny);
+  c.fillStyle = rgb(line); c.beginPath(); c.ellipse(nx - 2.2, ny, 1.4, 2.6, 0, 0, TAU); c.fill();
+  const fy = U.top[1], fxp = U.top[0];
+  const lab = '500 21px "Noto Sans SC", sans-serif';
+  c.font = lab; c.textAlign = "right"; c.textBaseline = "alphabetic";
+  c.setLineDash([4, 4]); c.lineWidth = 1.6;
+  c.strokeStyle = rgb(acc, .9); c.beginPath(); c.moveTo(fxp + 3, fy); c.lineTo(294, fy); c.stroke();
+  // 两条线谁在上，谁的字就写在线的上方，另一条写在下方，免得重叠
+  const fUp = fy <= ny, gap = Math.abs(fy - ny);
+  c.strokeStyle = rgb(mut, .55); c.beginPath(); c.moveTo(nx + 4, ny); c.lineTo(294, ny); c.stroke();
+  c.setLineDash([]);
+  c.fillStyle = rgb(acc); c.fillText("宫底", 294, fUp ? fy - 7 : fy + 23);
+  if (gap > 5) { c.fillStyle = rgb(mut); c.fillText("肚脐", 294, fUp ? ny + 23 : ny - 7); }
+  // 腿部在画布底部柔和淡出
+  c.save(); c.globalCompositeOperation = "destination-out";
+  const fo = c.createLinearGradient(0, 352, 0, 400);
+  fo.addColorStop(0, "rgba(0,0,0,0)"); fo.addColorStop(1, "rgba(0,0,0,1)");
+  c.fillStyle = fo; c.fillRect(0, 352, 300, 48);
+  c.restore();
 }
 
 // ---------- 画面合成：相邻阶段之间交叉淡化 ----------
