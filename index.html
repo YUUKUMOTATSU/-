@@ -74,11 +74,18 @@ button, input { font: inherit; color: inherit; }
 .layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; align-items: start; }
 .viewer { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; gap: 14px; min-width: 0; }
 
-.screen { position: relative; width: 100%; aspect-ratio: 6 / 5; max-width: 100%; max-height: max(320px, calc(100vh - 290px)); border-radius: 18px; overflow: hidden; background: var(--screen); box-shadow: 0 1px 0 var(--line), 0 18px 40px -24px rgba(60, 10, 30, .55); }
-.screen canvas { display: block; width: 100%; height: 100%; }
+.screen { position: relative; width: 100%; aspect-ratio: 6 / 5; max-width: 100%; max-height: max(320px, calc(100vh - 340px)); border-radius: 18px; overflow: hidden; background: var(--screen); box-shadow: 0 1px 0 var(--line), 0 18px 40px -24px rgba(60, 10, 30, .55); }
+.screen canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.cv3d { touch-action: pan-y; cursor: grab; }
+.cv3d:active { cursor: grabbing; }
+.fade { position: absolute; inset: 0; background: var(--screen); opacity: 0; transition: opacity .45s ease; pointer-events: none; }
+.fade.on { opacity: .9; transition: none; }
 .hud { position: absolute; display: flex; flex-direction: column; gap: 2px; color: var(--screen-ink); pointer-events: none; text-shadow: 0 1px 6px rgba(0, 0, 0, .6); }
 .hud-tl { top: 14px; left: 16px; }
 .hud-tr { top: 14px; right: 16px; text-align: right; align-items: flex-end; }
+.hud-bl { bottom: 12px; left: 16px; font-size: 12px; color: var(--screen-muted); }
+.hud-br { bottom: 12px; right: 16px; align-items: center; gap: 3px; font-family: var(--font-data); font-size: 12px; font-weight: 500; }
+.hud-br i { display: block; height: 7px; border: 2px solid var(--screen-ink); border-top: 0; opacity: .85; }
 .hud-stage { font-family: var(--font-display); font-size: 20px; letter-spacing: .04em; }
 .hud-sub { font-family: var(--font-data); font-size: 12px; color: var(--screen-muted); }
 .hud-heart { font-family: var(--font-data); font-size: 13px; display: flex; align-items: center; gap: 6px; }
@@ -113,9 +120,13 @@ button, input { font: inherit; color: inherit; }
 
 .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .controls .spacer { flex: 1; }
-.speed { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
-.speed button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; font-size: 13px; }
-.speed button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.viewbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.viewbar .spacer { flex: 1; }
+.btn-sm { padding: 4px 12px; font-size: 13px; }
+.btn-sm[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.speed, .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.speed button, .seg button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.speed button[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 
 .milestones { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
 .milestones button { flex: none; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
@@ -204,7 +215,7 @@ button, input { font: inherit; color: inherit; }
     <div>
       <p class="eyebrow">280 天 · 40 周 · 胎儿发育模拟</p>
       <h1>十月怀胎模拟器</h1>
-      <p class="lede">拖动时间轴，从末次月经第 1 天一直看到第 280 天的预产期。左边的画面随天数变化，右边告诉你这一周宝宝在长什么、妈妈要注意什么。</p>
+      <p class="lede">拖动时间轴，从末次月经第 1 天一直看到第 280 天的预产期。左边的 3D 模型会随天数长大，可以拖动旋转、放大细看；右边告诉你这一周宝宝在长什么、妈妈要注意什么。</p>
     </div>
     <form class="lmp" id="lmpForm">
       <label for="lmp">输入末次月经第一天，直接跳到今天</label>
@@ -219,7 +230,9 @@ button, input { font: inherit; color: inherit; }
   <main class="layout">
     <section class="viewer" aria-label="胎儿发育画面与时间轴">
       <div class="screen">
+        <canvas id="womb3d" class="cv3d" role="img" aria-label="胎儿发育 3D 模型，可拖动旋转" hidden></canvas>
         <canvas id="womb" role="img" aria-label="胎儿发育示意动画"></canvas>
+        <div class="fade" id="fade" aria-hidden="true"></div>
         <div class="hud hud-tl">
           <span class="hud-stage" id="hudStage">卵泡发育</span>
           <span class="hud-sub" id="hudView">显微视野</span>
@@ -228,6 +241,24 @@ button, input { font: inherit; color: inherit; }
           <span class="hud-heart" id="hudHeart" hidden><i></i><span id="hudBpm">—</span></span>
           <span class="hud-sub" id="hudAge"></span>
         </div>
+        <div class="hud hud-bl" id="hint3d" hidden>拖动旋转 · 双击复位</div>
+        <div class="hud hud-br" id="scale3d" hidden><b id="scaleLabel">1 cm</b><i id="scaleLine"></i></div>
+      </div>
+
+      <div class="viewbar">
+        <div class="seg" role="group" aria-label="显示方式">
+          <button type="button" data-mode="3d" aria-pressed="false">3D 模型</button>
+          <button type="button" data-mode="2d" aria-pressed="true">平面图</button>
+        </div>
+        <div class="seg ctl3d" role="group" aria-label="3D 风格">
+          <button type="button" data-style="real" aria-pressed="true">写实</button>
+          <button type="button" data-style="us" aria-pressed="false">四维彩超</button>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn btn-sm ctl3d" type="button" id="autoRot" aria-pressed="true">自动旋转</button>
+        <button class="btn btn-sm ctl3d" type="button" id="zoomOut" aria-label="缩小">−</button>
+        <button class="btn btn-sm ctl3d" type="button" id="zoomIn" aria-label="放大">+</button>
+        <button class="btn btn-sm ctl3d" type="button" id="resetView">复位</button>
       </div>
 
       <div class="timeline">
@@ -318,6 +349,330 @@ button, input { font: inherit; color: inherit; }
     </section>
   </main>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script id="sdfCore">
+
+// ---------- 3D：有向距离场（SDF）建模 + Surface Nets 网格化 ----------
+// 这段代码同时在主线程和 Web Worker 里运行，只用纯计算，不碰页面
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function smooth(a, b, x) { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+function bez(p, s) {
+  const u = 1 - s, a = u * u * u, b = 3 * u * u * s, k = 3 * u * s * s, e = s * s * s;
+  return [a * p[0][0] + b * p[1][0] + k * p[2][0] + e * p[3][0], a * p[0][1] + b * p[1][1] + k * p[2][1] + e * p[3][1]];
+}
+function smin(a, b, k) { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * .25; }
+function smaxf(a, b, k) { return -smin(-a, -b, k); }
+const v3 = {
+  add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  mul: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  len: a => Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]),
+  norm: a => { const l = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+  lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
+};
+// 以 dir 为长轴的正交基
+function basisAlong(dir, upHint) {
+  const z = v3.norm(dir); let x = v3.cross(upHint || [0, 1, 0], z);
+  if (v3.len(x) < 1e-4) x = v3.cross([1, 0, 0], z);
+  x = v3.norm(x); return [x, v3.cross(z, x), z];
+}
+
+// 形状构建器：按顺序做平滑并集 / 平滑差集；用包围球跳过不会影响结果的基本体
+function Shape() {
+  const ops = [], lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+  const grow = (c, r) => { for (let i = 0; i < 3; i++) { lo[i] = Math.min(lo[i], c[i] - r); hi[i] = Math.max(hi[i], c[i] + r); } };
+  const push = (p, k, sign) => ops.push({ f: p.f, k: k || 0, sign, cx: p.c[0], cy: p.c[1], cz: p.c[2], r: p.r * 1.15 + .02 });
+  const S = {
+    lo, hi,
+    add(p, k) { push(p, k, 1); grow(p.c, p.r); return S; },
+    sub(p, k) { push(p, k, -1); return S; },
+    eval(x, y, z) {
+      let d = 1e9;
+      for (let i = 0; i < ops.length; i++) {
+        const o = ops[i], dx = x - o.cx, dy = y - o.cy, dz = z - o.cz;
+        const lb = Math.sqrt(dx * dx + dy * dy + dz * dz) - o.r;
+        if (o.sign > 0) {
+          if (lb >= d + o.k) continue;
+          const v = o.f(x, y, z); d = o.k > 0 ? smin(d, v, o.k) : Math.min(d, v);
+        } else {
+          if (lb >= o.k - d) continue;
+          const v = o.f(x, y, z); d = o.k > 0 ? smaxf(d, -v, o.k) : Math.max(d, -v);
+        }
+      }
+      return d;
+    }
+  };
+  return S;
+}
+// 基本体：返回 { f, c（中心）, r（包围半径） }
+function pSphere(c, r) { const [a, b, e] = c; return { c, r, f: (x, y, z) => Math.sqrt((x - a) * (x - a) + (y - b) * (y - b) + (z - e) * (z - e)) - r }; }
+function pEllipsoid(c, rad, B) {
+  // B = [ex, ey, ez] 局部坐标轴；不传则与世界坐标轴对齐
+  const [ex, ey, ez] = B || [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [a, b, cc] = rad;
+  return { c, r: Math.max(a, b, cc), f: (x, y, z) => {
+    const px = x - c[0], py = y - c[1], pz = z - c[2];
+    const lx = (px * ex[0] + py * ex[1] + pz * ex[2]), ly = (px * ey[0] + py * ey[1] + pz * ey[2]), lz = (px * ez[0] + py * ez[1] + pz * ez[2]);
+    const ux = lx / a, uy = ly / b, uz = lz / cc, wx = ux / a, wy = uy / b, wz = uz / cc;
+    const k0 = Math.sqrt(ux * ux + uy * uy + uz * uz), k1 = Math.sqrt(wx * wx + wy * wy + wz * wz);
+    return k1 > 1e-9 ? k0 * (k0 - 1) / k1 : -Math.min(a, b, cc);
+  } };
+}
+// 圆锥胶囊（两端半径不同），iq 的精确公式
+function pCone(a, b, r1, r2) {
+  const bax = b[0] - a[0], bay = b[1] - a[1], baz = b[2] - a[2];
+  const l2 = bax * bax + bay * bay + baz * baz || 1e-9, rr = r1 - r2, a2 = l2 - rr * rr, il2 = 1 / l2;
+  const c = v3.lerp(a, b, .5), r = Math.sqrt(l2) / 2 + Math.max(r1, r2);
+  return { c, r, f: (x, y, z) => {
+    const pax = x - a[0], pay = y - a[1], paz = z - a[2];
+    const yy = pax * bax + pay * bay + paz * baz, zz = yy - l2;
+    const qx = pax * l2 - bax * yy, qy = pay * l2 - bay * yy, qz = paz * l2 - baz * yy;
+    const x2 = qx * qx + qy * qy + qz * qz, y2 = yy * yy * l2, z2 = zz * zz * l2;
+    const k = Math.sign(rr) * rr * rr * x2;
+    if (Math.sign(zz) * a2 * z2 > k) return Math.sqrt(x2 + z2) * il2 - r2;
+    if (Math.sign(yy) * a2 * y2 < k) return Math.sqrt(x2 + y2) * il2 - r1;
+    return (Math.sqrt(x2 * a2 * il2) + yy * rr) * il2 - r1;
+  } };
+}
+
+// Surface Nets：先粗采样，只在表面附近精确计算，再生成四边形网格
+function meshSDF(f, lo, hi, res, colorFn) {
+  const pad = .06, bmin = lo.map(v => v - pad), size = hi.map((v, i) => v + pad - bmin[i]);
+  const h = Math.max(...size) / res;
+  const NX = Math.ceil(size[0] / h) + 2, NY = Math.ceil(size[1] / h) + 2, NZ = Math.ceil(size[2] / h) + 2;
+  const C = 4, CX = Math.ceil((NX - 1) / C) + 1, CY = Math.ceil((NY - 1) / C) + 1, CZ = Math.ceil((NZ - 1) / C) + 1;
+  const coarse = new Float32Array(CX * CY * CZ);
+  for (let k = 0; k < CZ; k++) for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++)
+    coarse[i + CX * (j + CY * k)] = f(bmin[0] + i * C * h, bmin[1] + j * C * h, bmin[2] + k * C * h);
+  const vals = new Float32Array(NX * NY * NZ), thr = 1.6 * C * h;
+  for (let k = 0; k < NZ; k++) {
+    const ck = Math.min(CZ - 1, Math.round(k / C)), z = bmin[2] + k * h;
+    for (let j = 0; j < NY; j++) {
+      const cj = Math.min(CY - 1, Math.round(j / C)), y = bmin[1] + j * h;
+      for (let i = 0; i < NX; i++) {
+        const cv = coarse[Math.min(CX - 1, Math.round(i / C)) + CX * (cj + CY * ck)];
+        vals[i + NX * (j + NY * k)] = Math.abs(cv) > thr ? cv : f(bmin[0] + i * h, y, z);
+      }
+    }
+  }
+  const CNX = NX - 1, CNY = NY - 1, cellV = new Int32Array(CNX * CNY * (NZ - 1)).fill(-1);
+  const pos = [], idx = [];
+  const corner = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
+  const edges = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+  const cv = new Float32Array(8);
+  for (let k = 0; k < NZ - 1; k++) for (let j = 0; j < NY - 1; j++) for (let i = 0; i < NX - 1; i++) {
+    let mask = 0;
+    for (let q = 0; q < 8; q++) { const o = corner[q]; cv[q] = vals[(i + o[0]) + NX * ((j + o[1]) + NY * (k + o[2]))]; if (cv[q] < 0) mask |= 1 << q; }
+    if (mask === 0 || mask === 255) continue;
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (const [a, b] of edges) {
+      const va = cv[a], vb = cv[b];
+      if ((va < 0) === (vb < 0)) continue;
+      const t = va / (va - vb), A = corner[a], B = corner[b];
+      sx += A[0] + (B[0] - A[0]) * t; sy += A[1] + (B[1] - A[1]) * t; sz += A[2] + (B[2] - A[2]) * t; n++;
+    }
+    cellV[i + CNX * (j + CNY * k)] = pos.length / 3;
+    pos.push(bmin[0] + (i + sx / n) * h, bmin[1] + (j + sy / n) * h, bmin[2] + (k + sz / n) * h);
+  }
+  const cell = (i, j, k) => cellV[i + CNX * (j + CNY * k)];
+  const quad = (a, b, c, d, flip) => {
+    if (a < 0 || b < 0 || c < 0 || d < 0) return;
+    if (flip) idx.push(a, c, b, a, d, c); else idx.push(a, b, c, a, c, d);
+  };
+  for (let k = 1; k < NZ - 1; k++) for (let j = 1; j < NY - 1; j++) for (let i = 1; i < NX - 1; i++) {
+    const p = i + NX * (j + NY * k), inside = vals[p] < 0;
+    if (inside !== (vals[p + 1] < 0)) quad(cell(i, j - 1, k - 1), cell(i, j, k - 1), cell(i, j, k), cell(i, j - 1, k), !inside);
+    if (inside !== (vals[p + NX] < 0)) quad(cell(i - 1, j, k - 1), cell(i - 1, j, k), cell(i, j, k), cell(i, j, k - 1), !inside);
+    if (inside !== (vals[p + NX * NY] < 0)) quad(cell(i - 1, j - 1, k), cell(i, j - 1, k), cell(i, j, k), cell(i - 1, j, k), !inside);
+  }
+  // 法线取 SDF 梯度；顶点色 = 环境光遮蔽 × 细节着色
+  const nv = pos.length / 3, nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), e = h * .5;
+  for (let v = 0; v < nv; v++) {
+    const x = pos[3 * v], y = pos[3 * v + 1], z = pos[3 * v + 2];
+    const a = f(x + e, y - e, z - e), b = f(x - e, y - e, z + e), c = f(x - e, y + e, z - e), g = f(x + e, y + e, z + e);
+    const n = v3.norm([a - b - c + g, -a - b + c + g, -a + b - c + g]);
+    nor[3 * v] = n[0]; nor[3 * v + 1] = n[1]; nor[3 * v + 2] = n[2];
+    const o1 = .025 - f(x + n[0] * .025, y + n[1] * .025, z + n[2] * .025), o2 = .06 - f(x + n[0] * .06, y + n[1] * .06, z + n[2] * .06);
+    const ao = clamp(1 - (o1 * 6 + o2 * 3.2), .35, 1);
+    const tint = colorFn ? colorFn(x, y, z) : [1, 1, 1];
+    col[3 * v] = tint[0] * ao; col[3 * v + 1] = tint[1] * ao; col[3 * v + 2] = tint[2] * ao;
+  }
+  return { pos: new Float32Array(pos), nor, col, idx: new Uint32Array(idx), h };
+}
+
+// ---------- 3D：胚胎与胎儿的形体（单位：头臀长 ≈ 1；y 向上，z 朝腹侧/面部，x 为身体左侧） ----------
+function widen(p, sx) { const f = p.f; return { c: p.c, r: p.r * Math.max(1, sx), f: (x, y, z) => f(x / sx, y, z) }; }
+const band = (x, c, w) => Math.exp(-(((x - c) / w) ** 2));
+
+function embryoShape(d) {
+  const e = smooth(29, 56, d);
+  const a0 = lerp(-2.15, -1.75, e), a1 = lerp(2.55, 1.95, e), rad = lerp(.34, .4, e);
+  const end = lerp(1, .86, smooth(44, 56, d)), hb = lerp(.16, .27, e);
+  const P2 = s => { const th = lerp(a0, a1, s), rr = rad * (1 - .45 * smooth(.7, 1, s) * (1 - .6 * e)); return [Math.cos(th) * rr, Math.sin(th) * rr, th]; };
+  const P3 = s => { const p = P2(s); return [0, -p[1], -p[0]]; };
+  const dors = s => { const th = P2(s)[2]; return [0, -Math.sin(th), -Math.cos(th)]; };
+  const tan = s => v3.norm(v3.sub(P3(Math.min(1, s + .01)), P3(Math.max(0, s - .01))));
+  const Wd = s => (.1 + (hb - .1) * band(s, .07, .12) + .03 * band(s, .42, .15)) * (1 - .88 * smooth(.72, 1, s / end * .98 + .02));
+  const S = Shape();
+  const n = 18;
+  for (let i = 0; i < n; i++) {
+    const s0 = end * i / n, s1 = end * (i + 1) / n;
+    S.add(widen(pCone(P3(s0), P3(s1), Wd(s0), Wd(s1)), .92), .03);
+  }
+  const so = 1 - smooth(40, 48, d);
+  if (so > .05) for (let s = .2; s < .8 * end; s += .04) for (const l of [-1, 1])
+    S.add(pSphere(v3.add(v3.add(P3(s), v3.mul(dors(s), Wd(s) * .8)), [l * .035, 0, 0]), .022 * so), .015);
+  const ar = 1 - smooth(44, 52, d);
+  if (ar > .05 && d > 30) for (const s of [.17, .205, .24]) for (const l of [-1, 1])
+    S.add(pSphere(v3.add(v3.add(P3(s), v3.mul(dors(s), -Wd(s) * .5)), [l * Wd(s) * .55, 0, 0]), .03 * ar), .015);
+  const heart = v3.add(P3(.3), v3.mul(dors(.3), -Wd(.3) * .72));
+  S.add(pSphere(heart, .085), .05);
+  const limb = (s0, len, side) => {
+    if (len < .01) return;
+    const base = v3.add(v3.add(P3(s0), v3.mul(dors(s0), -Wd(s0) * .25)), [side * Wd(s0) * .72, 0, 0]);
+    const dir = v3.norm(v3.add(v3.add([side * .55, 0, 0], v3.mul(dors(s0), -.6)), v3.mul(tan(s0), .55)));
+    const tip = v3.add(base, v3.mul(dir, len)), pad = smooth(44, 52, d);
+    S.add(pCone(base, tip, .045, .038), .03);
+    const B = basisAlong(dir, [side, 0, 0]);
+    S.add(pEllipsoid(tip, [.055 * (1 + .5 * pad), .02, .05], B), .02);
+    if (d > 49) for (let k = -1.5; k <= 1.5; k++) S.add(pSphere(v3.add(tip, v3.add(v3.mul(B[0], k * .028 * (1 + .5 * pad)), v3.mul(dir, .045))), .014 * smooth(49, 56, d)), .01);
+  };
+  for (const side of [-1, 1]) { limb(.37, .3 * smooth(37, 56, d), side); limb(.68, .26 * smooth(41, 58, d), side); }
+  const eyeC = side => v3.add(v3.add(P3(.06), v3.mul(dors(.06), -Wd(.06) * .35)), [side * Wd(.06) * .78, 0, 0]);
+  const eyes = [eyeC(-1), eyeC(1)], eo = smooth(39, 47, d);
+  const color = (x, y, z) => {
+    let k = 1;
+    for (const E of eyes) { const dd = Math.hypot(x - E[0], y - E[1], z - E[2]); k *= 1 - .75 * eo * smooth(.05, .03, dd); }
+    const hd = Math.hypot(x - heart[0], y - heart[1], z - heart[2]);
+    const red = smooth(.13, .06, hd);
+    return [k * (1 + .05 * red), k * (1 - .35 * red), k * (1 - .3 * red)];
+  };
+  return { S, color, heart, navel: v3.add(P3(.5), v3.mul(dors(.5), -Wd(.5) * .9)), unitCRL: 1 };
+}
+
+function fetusShape(d) {
+  const u = clamp((d - 56) / 224, 0, 1);
+  const hr = lerp(.29, .2, Math.pow(u, .7));
+  const plump = lerp(.6, .95, smooth(.12, 1, u)), lp = lerp(.7, 1.05, smooth(.12, 1, u));
+  const legLen = lerp(.78, 1, u), armLen = lerp(.85, 1, u);
+  const sp = [[.02, -.2], [.3, -.15], [.31, .28], [.04, .37]];
+  const rb = s => plump * (.065 + .11 * Math.sin(Math.PI * (.12 + .78 * s)));
+  const S3 = s => { const p = bez(sp, s); return [0, -p[1], -p[0]]; };
+  const tan = s => v3.norm(v3.sub(S3(Math.min(1, s + .01)), S3(Math.max(0, s - .01))));
+  const ven = s => { const t = tan(s); return v3.norm([0, t[2], -t[1]]); };
+  const S = Shape();
+  const ts = [0, .12, .24, .36, .48, .6, .72, .84, .94, 1];
+  for (let i = 0; i < ts.length - 1; i++) S.add(widen(pCone(S3(ts[i]), S3(ts[i + 1]), rb(ts[i]), rb(ts[i + 1])), 1.12), .03);
+  for (const l of [-1, 1]) S.add(pSphere(v3.add(v3.add(S3(.94), v3.mul(ven(.94), -rb(.94) * .25)), [l * .06 * plump, 0, 0]), rb(.94) * .72), .05);
+  const bc = v3.add(S3(.6), v3.mul(ven(.6), rb(.6) * .3));
+  S.add(pEllipsoid(bc, [rb(.6) * 1.05, rb(.6) * 1.0, rb(.6) * .85]), .06);
+
+  // 头部坐标系：下巴略收
+  const N2 = bez(sp, 0), Hc = [0, -(N2[1] - hr * .92), -(N2[0] - .07)];
+  const tau = lerp(.45, .3, u), up = [0, Math.cos(tau), Math.sin(tau)], fw = [0, -Math.sin(tau), Math.cos(tau)], lat = [1, 0, 0];
+  const HB = [lat, up, fw];
+  const H = (a, b, c) => [Hc[0] + a * hr, Hc[1] + up[1] * b * hr + fw[1] * c * hr, Hc[2] + up[2] * b * hr + fw[2] * c * hr];
+  const R = v => v.map(x => x * hr);
+  S.add(pCone(S3(0), H(0, -.62, -.15), rb(0) * .95, .5 * hr), .06);
+  S.add(pEllipsoid(H(0, .1, -.1), R([.86, .98, 1.06]), HB), .04);
+  S.add(pEllipsoid(H(0, -.4, .38), R([.6, .52, .58]), HB), .2 * hr);
+  for (const l of [-1, 1]) S.add(pSphere(H(l * .34, -.36, .58), .28 * hr * lerp(.85, 1.1, u)), .12 * hr);
+  S.add(pEllipsoid(H(0, -.76, .62), R([.2, .16, .18]), HB), .1 * hr);
+  S.add(pEllipsoid(H(0, .18, .82), R([.5, .1, .12]), HB), .1 * hr);
+  S.add(pCone(H(0, .05, .88), H(0, -.18, .98), .07 * hr, .1 * hr), .06 * hr);
+  S.add(pEllipsoid(H(0, -.2, .98), R([.12, .1, .12]), HB), .08 * hr);
+  const eyesOpen = d >= 182;
+  for (const l of [-1, 1]) S.sub(pSphere(H(l * .35, 0, .9), .16 * hr), .08 * hr);
+  for (const l of [-1, 1]) S.add(pEllipsoid(H(l * .35, eyesOpen ? .07 : -.01, .8), R(eyesOpen ? [.15, .07, .095] : [.15, .11, .1]), HB), .03 * hr);
+  S.add(pEllipsoid(H(0, -.56, .9), R([.2, .08, .1]), HB), .04 * hr);
+  const earY = lerp(-.55, -.12, smooth(56, 126, d));
+  for (const l of [-1, 1]) {
+    S.add(pEllipsoid(H(l * .84, earY, -.1), R([.07, .24, .16]), HB), .03 * hr);
+    S.sub(pEllipsoid(H(l * .93, earY - .02, -.07), R([.05, .13, .08]), HB), .02 * hr);
+  }
+
+  // 手臂：近侧（+x）的手放在嘴边，远侧的手放在胸前
+  for (const s of [1, -1]) {
+    const Sh = v3.add(v3.add(S3(.13), [s * rb(.13), 0, 0]), v3.mul(ven(.13), rb(.13) * .15));
+    const El = v3.add(Sh, v3.mul([s * .05, -.1, .12], armLen));
+    const Hd = s > 0 ? H(.3, -.66, 1.02) : v3.add(v3.add(S3(.22), v3.mul(ven(.22), rb(.22) * 1.12)), [-.05, .02, 0]);
+    const dir = v3.norm(v3.sub(Hd, El)), Wr = v3.sub(Hd, v3.mul(dir, .035 * lp));
+    S.add(pCone(Sh, El, .046 * lp, .038 * lp), .03);
+    S.add(pCone(El, Wr, .038 * lp, .03 * lp), .02);
+    const B = basisAlong(dir, [s, 0, 0]);
+    S.add(pEllipsoid(Hd, [.045 * lp, .022 * lp, .055 * lp], B), .02);
+    S.add(pCone(v3.add(Wr, v3.mul(B[1], .02 * lp)), v3.add(v3.add(Hd, v3.mul(B[1], .035 * lp)), v3.mul(dir, .015)), .014 * lp, .011 * lp), .01);
+  }
+  // 腿：膝盖收到肚子前，脚在臀部前方
+  for (const s of [1, -1]) {
+    const Hp = v3.add(v3.add(S3(.86), [s * .075 * plump, 0, 0]), v3.mul(ven(.86), .02));
+    const K = v3.add(Hp, v3.mul([s * .05, .17 + s * .02, .22], legLen));
+    const A = v3.add(K, v3.mul([-s * .01, -.24, -.05], legLen));
+    const fd = v3.norm([-s * .25, -.15, 1]), F = v3.add(A, v3.mul(fd, .04 * legLen));
+    S.add(pCone(Hp, K, .078 * lp, .056 * lp), .04);
+    S.add(pCone(K, A, .056 * lp, .034 * lp), .02);
+    S.add(pEllipsoid(F, [.032 * lp, .024 * lp, .065 * lp * legLen], basisAlong(fd, [0, 1, 0])), .02);
+  }
+
+  const hairAmt = smooth(140, 265, d), browAmt = smooth(150, 220, d);
+  const color = (x, y, z) => {
+    const q = [x - Hc[0], y - Hc[1], z - Hc[2]];
+    const ql = [q[0] / hr, v3.dot(q, up) / hr, v3.dot(q, fw) / hr];
+    let r = 1, g = 1, b = 1;
+    if (ql[2] > .3 && Math.abs(ql[0]) < 1.2 && ql[1] < .6 && ql[1] > -1.1) {
+      const front = smooth(.5, .75, ql[2]);
+      const m = band(ql[1], -.57, .055) * smooth(.24, .1, Math.abs(ql[0])) * front;
+      r *= 1 - .5 * m; g *= 1 - .55 * m; b *= 1 - .5 * m;
+      const lip = smooth(.2, .08, Math.hypot(ql[0] / 1.6, ql[1] + .56)) * front;
+      g *= 1 - .12 * lip; b *= 1 - .1 * lip;
+      for (const l of [-1, 1]) {
+        const ex = ql[0] - l * .35;
+        if (!eyesOpen) { const lid = band(ql[1], -.03 - .6 * ex * ex, .045) * smooth(.17, .1, Math.abs(ex)) * front; r *= 1 - .45 * lid; g *= 1 - .5 * lid; b *= 1 - .45 * lid; }
+        const brow = band(ql[1], .2 - .4 * ex * ex, .06) * smooth(.2, .12, Math.abs(ex)) * browAmt * front;
+        r *= 1 - .18 * brow; g *= 1 - .24 * brow; b *= 1 - .26 * brow;
+        const ch = smooth(.3, .1, Math.hypot(ql[0] - l * .38, ql[1] + .36)) * front;
+        g *= 1 - .07 * ch; b *= 1 - .06 * ch;
+        const ns = smooth(.07, .03, Math.hypot(ql[0] - l * .055, ql[1] + .27)) * smooth(.9, 1, ql[2]);
+        r *= 1 - .4 * ns; g *= 1 - .45 * ns; b *= 1 - .4 * ns;
+      }
+    }
+    if (hairAmt > 0) {
+      const dl = Math.hypot(...ql);
+      const scalp = smooth(-.1, .35, ql[1] * .8 - ql[2] * .6) * smooth(.8, .95, dl) * smooth(1.25, 1.1, dl);
+      const hh = .55 * hairAmt * scalp;
+      r = lerp(r, .52, hh); g = lerp(g, .4, hh); b = lerp(b, .36, hh);
+    }
+    return [r, g, b];
+  };
+  const eyeC = eyesOpen ? [-1, 1].map(l => H(l * .35, -.03, .74)) : [];
+  return { S, color, eyes: eyeC, eyeR: .075 * hr, navel: v3.add(S3(.62), v3.mul(ven(.62), rb(.62) * .92)), heart: v3.add(S3(.3), v3.mul(ven(.3), rb(.3) * .2)), unitCRL: lerp(1.19, 1.01, u) };
+}
+
+// 生成居中的网格；第 55–59 天把胚胎和胎儿的距离场混合，做出连续变形
+const MORPH_K = .76;
+function buildBody(d, res) {
+  const mid = S => [0, 1, 2].map(i => (S.lo[i] + S.hi[i]) / 2);
+  const kind = d < 55 ? "embryo" : d < 59 ? "morph" : "fetus";
+  if (kind !== "morph") {
+    const b = kind === "embryo" ? embryoShape(d) : fetusShape(d), c = mid(b.S);
+    const f = (x, y, z) => b.S.eval(x + c[0], y + c[1], z + c[2]);
+    const lo = b.S.lo.map((v, i) => v - c[i]), hi = b.S.hi.map((v, i) => v - c[i]);
+    const m = meshSDF(f, lo, hi, res, (x, y, z) => b.color(x + c[0], y + c[1], z + c[2]));
+    const sh = p => p && v3.sub(p, c);
+    return { kind, mesh: m, navel: sh(b.navel), heart: sh(b.heart), eyes: (b.eyes || []).map(sh), eyeR: b.eyeR || 0, unitCRL: b.unitCRL };
+  }
+  const t = smooth(55, 59, d), A = embryoShape(d), B = fetusShape(d), ca = mid(A.S), cb = mid(B.S), k = MORPH_K;
+  const f = (x, y, z) => (1 - t) * A.S.eval(x + ca[0], y + ca[1], z + ca[2]) + t * k * B.S.eval(x / k + cb[0], y / k + cb[1], z / k + cb[2]);
+  const lo = [0, 1, 2].map(i => Math.min(A.S.lo[i] - ca[i], (B.S.lo[i] - cb[i]) * k));
+  const hi = [0, 1, 2].map(i => Math.max(A.S.hi[i] - ca[i], (B.S.hi[i] - cb[i]) * k));
+  const col = t < .5 ? (x, y, z) => A.color(x + ca[0], y + ca[1], z + ca[2]) : (x, y, z) => B.color(x / k + cb[0], y / k + cb[1], z / k + cb[2]);
+  const m = meshSDF(f, lo, hi, res, col);
+  const nav = v3.lerp(v3.sub(A.navel, ca), v3.mul(v3.sub(B.navel, cb), k), t);
+  return { kind, mesh: m, navel: nav, heart: v3.sub(A.heart, ca), eyes: [], eyeR: 0, unitCRL: lerp(1, B.unitCRL * k, t), morph: t };
+}
+</script>
 <script>
 // 每周内容：t 标题，f 大小比喻，dev 胎儿发育，mom 妈妈注意事项
 const WEEKS = [null,
@@ -501,9 +856,6 @@ function stageOf(d) {
 
 // ---------- 工具 ----------
 const TAU = Math.PI * 2;
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const lerp = (a, b, t) => a + (b - a) * t;
-const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 function circ(c, x, y, r) { c.moveTo(x + r, y); c.arc(x, y, Math.max(0, r), 0, TAU); }
 function mix(a, b, t) { return a.map((v, i) => Math.round(lerp(v, b[i], t))); }
@@ -883,10 +1235,6 @@ function sceneEmbryo(c, W, H, d, t) {
 }
 
 // ---------- 胎儿期：蜷缩的胎儿，随周数变大、长肉、转为头朝下 ----------
-function bez(p, s) {
-  const u = 1 - s, a = u * u * u, b = 3 * u * u * s, k = 3 * u * s * s, e = s * s * s;
-  return [a * p[0][0] + b * p[1][0] + k * p[2][0] + e * p[3][0], a * p[0][1] + b * p[1][1] + k * p[2][1] + e * p[3][1]];
-}
 function seg(c, a, b, r0, r1) {
   c.beginPath();
   for (let k = 0; k <= 12; k++) { const q = k / 12; circ(c, lerp(a[0], b[0], q), lerp(a[1], b[1], q), lerp(r0, r1, q)); }
@@ -1114,11 +1462,529 @@ function drawMom(d) {
   c.fillText("肚脐", 292, 230);
 }
 
+// ---------- 3D 场景：子宫、羊膜囊、胎盘、脐带、光照、拖动旋转 ----------
+const G = { ok: false };
+const lin = hex => new THREE.Color(hex).convertSRGBToLinear();
+
+function fresnelMat(color, power, intensity, additive) {
+  return new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color(color) }, power: { value: power }, intensity: { value: intensity } },
+    vertexShader: "varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
+    fragmentShader: "uniform vec3 color; uniform float power; uniform float intensity; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - clamp(abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), power) * intensity; gl_FragColor = vec4(color * (" + (additive ? "f" : "1.0") + "), " + (additive ? "1.0" : "f") + "); }",
+    transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending
+  });
+}
+function spriteTex() {
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(.4, "rgba(255,255,255,.35)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+function init3D() {
+  if (!window.THREE) return false;
+  const cv = document.getElementById("womb3d");
+  try {
+    G.renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+  } catch (e) { return false; }
+  const R = G.renderer;
+  R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  R.outputEncoding = THREE.sRGBEncoding;
+  R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = .95;
+  const scene = G.scene = new THREE.Scene();
+  scene.background = new THREE.Color("#12070b");
+  const cam = G.camera = new THREE.PerspectiveCamera(34, 1.2, .02, 60);
+  scene.add(cam);
+  G.target = new THREE.Vector3();
+
+  // 光：主光和轮廓光跟着相机走，保证从任何角度都看得清
+  G.hemi = new THREE.HemisphereLight(0xffe4dc, 0x3a0c18, .75); scene.add(G.hemi);
+  const tgt = new THREE.Object3D(); scene.add(tgt);
+  G.key = new THREE.DirectionalLight(0xfff0e6, 1.55); G.key.position.set(1.6, 2.2, 1.2); G.key.target = tgt; cam.add(G.key);
+  G.rim = new THREE.DirectionalLight(0xff8098, 1.25); G.rim.position.set(-1.2, 1.4, -8); G.rim.target = tgt; cam.add(G.rim);
+  G.fill = new THREE.DirectionalLight(0xffc0b0, .35); G.fill.position.set(-2, -1, 1); G.fill.target = tgt; cam.add(G.fill);
+
+  // 子宫壁背景
+  G.backdrop = new THREE.Mesh(new THREE.SphereGeometry(20, 48, 32), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms: { dim: { value: 1 } },
+    vertexShader: "varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: "uniform float dim; varying vec3 vP; void main(){ vec3 p = normalize(vP); float v = 0.5 + 0.5 * sin(p.x * 11.0 + sin(p.y * 7.0) * 2.5) * sin(p.y * 9.0 + p.z * 6.0 + sin(p.x * 5.0)); vec3 base = mix(vec3(0.07, 0.02, 0.035), vec3(0.36, 0.08, 0.12), smoothstep(-0.7, 0.9, p.y * 0.55 + p.z * 0.35 + 0.25)); base += vec3(0.07, 0.008, 0.015) * v * v; gl_FragColor = vec4(base * dim, 1.0); }"
+  }));
+  scene.add(G.backdrop);
+
+  // 羊膜囊（半透明的泡）
+  G.env = new THREE.Group(); scene.add(G.env);
+  G.sac = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), fresnelMat("#ffd6de", 2.2, .5));
+  G.env.add(G.sac);
+  G.sacFill = new THREE.Mesh(new THREE.SphereGeometry(.995, 48, 32), new THREE.MeshBasicMaterial({ color: lin("#7a2236"), transparent: true, opacity: .1, depthWrite: false, side: THREE.BackSide }));
+  G.env.add(G.sacFill);
+
+  // 漂浮的微粒
+  const pp = new Float32Array(420 * 3), r0 = rng(5);
+  for (let i = 0; i < 420; i++) { const a = r0() * TAU, b = Math.acos(2 * r0() - 1), rr = Math.cbrt(r0()) * 1.6; pp.set([Math.sin(b) * Math.cos(a) * rr, Math.cos(b) * rr, Math.sin(b) * Math.sin(a) * rr], i * 3); }
+  const pg = new THREE.BufferGeometry(); pg.setAttribute("position", new THREE.BufferAttribute(pp, 3));
+  G.specks = new THREE.Points(pg, new THREE.PointsMaterial({ size: .03, map: spriteTex(), color: 0xffc9d4, transparent: true, opacity: .45, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(G.specks);
+
+  buildPlacenta();
+  buildBodyGroup();
+  buildMicro3D();
+  buildImplant3D();
+  setupOrbit(cv);
+  G.ok = true;
+  return true;
+}
+
+// 胎盘：贴在子宫后上方的厚盘，表面有分叶和血管
+function buildPlacenta() {
+  const geo = new THREE.SphereGeometry(1, 72, 36), pos = geo.attributes.position, n = pos.count;
+  const cols = new Float32Array(n * 3), rr = rng(41), lobes = [];
+  for (let i = 0; i < 18; i++) lobes.push([rr() * 2 - 1, rr() * 2 - 1, .1 + rr() * .12]);
+  for (let i = 0; i < n; i++) {
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), bump = 0;
+    for (const [lx, lz, lr] of lobes) bump += Math.exp(-((x - lx) ** 2 + (z - lz) ** 2) / (lr * lr));
+    const k = 1 + .05 * Math.min(1.5, bump) + .015 * Math.sin(x * 23) * Math.sin(z * 19);
+    pos.setXYZ(i, x * k, y * k, z * k);
+    const c = lin("#8c1f35").lerp(lin("#5c0f22"), clamp(.5 - y * .6 + .2 * Math.sin(x * 9 + z * 7), 0, 1));
+    cols.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
+  G.placentaMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .62, metalness: 0 });
+  G.placenta = new THREE.Mesh(geo, G.placentaMat);
+  G.placentaDir = new THREE.Vector3(-.28, .62, -.73).normalize();
+  G.placentaPivot = new THREE.Group();
+  G.placentaPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), G.placentaDir.clone().negate());
+  G.placentaPivot.add(G.placenta);
+  G.env.add(G.placentaPivot);
+  // 胎盘胎儿面的血管：从脐带附着点放射出去
+  G.vesselMat = new THREE.MeshStandardMaterial({ color: lin("#4c2560"), roughness: .45 });
+  G.vessels = new THREE.Group(); G.placentaPivot.add(G.vessels);
+  G.cordMats = {
+    jelly: new THREE.MeshPhysicalMaterial({ color: lin("#efdbe2"), roughness: .25, clearcoat: .8, transparent: true, opacity: .42, depthWrite: false }),
+    vein: new THREE.MeshStandardMaterial({ color: lin("#8a2442"), roughness: .4 }),
+    artery: new THREE.MeshStandardMaterial({ color: lin("#5a3c86"), roughness: .4 })
+  };
+  G.cord = new THREE.Group(); G.env.add(G.cord);
+}
+function placePlacenta(size, thick) {
+  // size：盘的半径（世界单位），thick：厚度
+  G.placenta.scale.set(size, thick, size);
+  G.placenta.position.set(0, 1 - thick * .55, 0);
+  G.placentaPivot.position.set(0, 0, 0);
+  const key = size.toFixed(3);
+  if (G.vesselKey === key) return;
+  G.vesselKey = key;
+  G.vessels.children.forEach(m => m.geometry.dispose()); G.vessels.clear();
+  const rr = rng(77);
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * TAU + rr() * .4, pts = [];
+    for (let k = 0; k <= 10; k++) {
+      const s = k / 10 * size * .85, w = Math.sin(k * .9 + i) * .03 * size;
+      const x = Math.cos(a) * s - Math.sin(a) * w, z = Math.sin(a) * s + Math.cos(a) * w;
+      const sphY = Math.sqrt(Math.max(0, 1 - (x * x + z * z) / (size * size)));
+      pts.push(new THREE.Vector3(x, 1 - thick * .55 - thick * sphY * 1.08, z));
+    }
+    G.vessels.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, .012 * size / .55 * (1 - i % 2 * .3), 6), G.vesselMat));
+  }
+  G.cordStartLocal = new THREE.Vector3(0, 1 - thick * 1.6, 0);
+}
+
+// 脐带：两条动脉缠绕一条静脉，外面裹一层半透明的胶状组织
+function buildCord(S, E, radius, side, ventral) {
+  G.cord.children.forEach(m => m.geometry.dispose()); G.cord.clear();
+  const P1 = S.clone().lerp(E, .3).addScaledVector(side, .55);
+  const P2 = E.clone().addScaledVector(ventral, .28).addScaledVector(side, .3);
+  const mid = S.clone().lerp(E, .65).addScaledVector(side, .62).addScaledVector(ventral, .15);
+  const curve = new THREE.CatmullRomCurve3([S, P1, mid, P2, E]);
+  const N = 140, fr = curve.computeFrenetFrames(N, false), len = curve.getLength(), turns = len * 11;
+  const strand = (off, phase) => {
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, p = curve.getPointAt(t), a = phase + t * turns * TAU;
+      p.addScaledVector(fr.normals[i], Math.cos(a) * off * radius).addScaledVector(fr.binormals[i], Math.sin(a) * off * radius);
+      pts.push(p);
+    }
+    return new THREE.CatmullRomCurve3(pts);
+  };
+  G.cord.add(new THREE.Mesh(new THREE.TubeGeometry(strand(.32, 0), N, radius * .42, 8), G.cordMats.vein));
+  G.cord.add(new THREE.Mesh(new THREE.TubeGeometry(strand(.5, 2.1), N, radius * .26, 6), G.cordMats.artery));
+  G.cord.add(new THREE.Mesh(new THREE.TubeGeometry(strand(.5, 4.2), N, radius * .26, 6), G.cordMats.artery));
+  const jelly = new THREE.Mesh(new THREE.TubeGeometry(curve, N, radius, 14), G.cordMats.jelly);
+  jelly.renderOrder = 2; G.cord.add(jelly);
+}
+
+// 身体：皮肤网格 + 轮廓透光层 + 心脏 + 眼睛 + 卵黄囊
+function buildBodyGroup() {
+  G.body = new THREE.Group(); G.env.add(G.body);
+  G.skinMat = new THREE.MeshPhysicalMaterial({ color: lin("#f2c2b0"), roughness: .5, metalness: 0, clearcoat: .3, clearcoatRoughness: .45, vertexColors: true, transparent: true });
+  G.glowMat = fresnelMat("#ff6a7a", 2.4, .55, true);
+  G.skin = new THREE.Mesh(new THREE.BufferGeometry(), G.skinMat);
+  G.glow = new THREE.Mesh(G.skin.geometry, G.glowMat);
+  G.glow.renderOrder = 3;
+  G.heart = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshStandardMaterial({ color: lin("#d0283f"), emissive: lin("#ff2a45"), emissiveIntensity: .8, roughness: .4 }));
+  G.heart.renderOrder = -1;
+  G.eyeMat = new THREE.MeshPhysicalMaterial({ color: lin("#3a3340"), roughness: .2, clearcoat: 1, clearcoatRoughness: .08 });
+  G.eyes = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), G.eyeMat); G.body.add(m); m.visible = false; return m; });
+  G.body.add(G.heart, G.skin, G.glow);
+  G.yolk = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), new THREE.MeshStandardMaterial({ color: lin("#f2cf86"), roughness: .45, emissive: lin("#5a3a10"), emissiveIntensity: .25 }));
+  G.env.add(G.yolk);
+  G.yolkDuct = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ color: lin("#e3b778"), roughness: .5 }));
+  G.env.add(G.yolkDuct);
+}
+function setBodyMesh(r) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(r.pos, 3));
+  g.setAttribute("normal", new THREE.BufferAttribute(r.nor, 3));
+  g.setAttribute("color", new THREE.BufferAttribute(r.col, 3));
+  g.setIndex(new THREE.BufferAttribute(r.idx, 1));
+  g.computeBoundingSphere();
+  G.skin.geometry.dispose();
+  G.skin.geometry = g; G.glow.geometry = g;
+  G.bodyInfo = r;
+}
+
+// 拖动旋转、滚轮 / 双指缩放、双击复位
+function setupOrbit(cv) {
+  const O = G.orbit = { yaw: .62, pitch: .1, zoom: 1, auto: true, drag: null, pts: new Map() };
+  cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); O.pts.set(e.pointerId, [e.clientX, e.clientY]); O.drag = [e.clientX, e.clientY]; setAuto(false); });
+  cv.addEventListener("pointermove", e => {
+    if (!O.pts.has(e.pointerId)) return;
+    const prev = O.pts.get(e.pointerId);
+    if (O.pts.size === 2) {
+      const other = [...O.pts].find(([id]) => id !== e.pointerId)[1];
+      const d0 = Math.hypot(prev[0] - other[0], prev[1] - other[1]), d1 = Math.hypot(e.clientX - other[0], e.clientY - other[1]);
+      if (d0 > 0) O.zoom = clamp(O.zoom * d0 / d1, .45, 2.2);
+    } else {
+      O.yaw -= (e.clientX - prev[0]) * .009;
+      O.pitch = clamp(O.pitch + (e.clientY - prev[1]) * .007, -1.25, 1.25);
+    }
+    O.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  });
+  const up = e => { O.pts.delete(e.pointerId); };
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  cv.addEventListener("wheel", e => { e.preventDefault(); O.zoom = clamp(O.zoom * Math.exp(e.deltaY * .0012), .45, 2.2); }, { passive: false });
+  cv.addEventListener("dblclick", () => resetView());
+}
+function resetView() { const O = G.orbit; O.yaw = .62; O.pitch = .1; O.zoom = 1; }
+function setAuto(on) {
+  G.orbit.auto = on;
+  const b = document.getElementById("autoRot");
+  if (b) b.setAttribute("aria-pressed", String(on));
+}
+function placeCamera(frameR, dt) {
+  const O = G.orbit;
+  if (O.auto && !reduceMotion) O.yaw += dt * .18;
+  const dist = O.zoom * frameR * 3.55, cp = Math.cos(O.pitch);
+  G.camera.position.set(G.target.x + dist * cp * Math.cos(O.yaw), G.target.y + dist * Math.sin(O.pitch), G.target.z + dist * cp * Math.sin(O.yaw));
+  G.camera.lookAt(G.target);
+  return dist;
+}
+
+// ---------- 3D 早期阶段：卵子、受精、卵裂、囊胚、着床 ----------
+function fib(i, n) { const y = 1 - 2 * (i + .5) / n, r = Math.sqrt(1 - y * y), a = i * 2.39996; return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r); }
+const T3 = !!window.THREE, _m4 = T3 && new THREE.Matrix4(), _q = T3 && new THREE.Quaternion(), _s = T3 && new THREE.Vector3(), _p = T3 && new THREE.Vector3(), _z = T3 && new THREE.Vector3(0, 0, 1);
+function setInst(mesh, i, pos, dir, sx, sy, sz) {
+  _q.setFromUnitVectors(_z, dir || _z); _s.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz);
+  _m4.compose(pos, _q, _s); mesh.setMatrixAt(i, _m4);
+}
+function nucleusMat(xray) { return new THREE.MeshStandardMaterial({ color: lin("#fff0ea"), emissive: lin("#7a3434"), emissiveIntensity: .25, roughness: .35, transparent: !!xray, opacity: xray ? .55 : 1, depthTest: !xray }); }
+
+// 囊胚：外层扁平的滋养层细胞 + 一团内细胞团（单位半径 1）
+function makeBlastocyst() {
+  const g = new THREE.Group();
+  const troph = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshStandardMaterial({ color: lin("#e6a595"), roughness: .55 }), 130);
+  for (let i = 0; i < 130; i++) { const d = fib(i, 130); setInst(troph, i, d.clone().multiplyScalar(.97), d, .15, .15, .055); }
+  const icm = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshPhysicalMaterial({ color: lin("#f3c3b3"), roughness: .45, clearcoat: .3 }), 16);
+  const r = rng(12);
+  for (let i = 0; i < 16; i++) { const d = fib(i, 16); setInst(icm, i, new THREE.Vector3(d.x * .3, .62 + d.y * .16, d.z * .3), null, .14 + r() * .03); }
+  const cav = new THREE.Mesh(new THREE.SphereGeometry(.94, 40, 30), fresnelMat("#ffd0d8", 1.6, .35));
+  g.add(troph, icm, cav);
+  return g;
+}
+
+function buildMicro3D() {
+  const M = G.micro = { group: new THREE.Group() };
+  G.scene.add(M.group);
+  const c = document.createElement("canvas"); c.width = 512; c.height = 256;
+  const x = c.getContext("2d"), r = rng(8);
+  x.fillStyle = "#f7d8ca"; x.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 2600; i++) { x.fillStyle = `rgba(${150 + r() * 40 | 0},${70 + r() * 30 | 0},${72 + r() * 30 | 0},${.1 + r() * .18})`; x.beginPath(); x.arc(r() * 512, r() * 256, .6 + r() * 1.8, 0, TAU); x.fill(); }
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+  M.cyto = new THREE.Mesh(new THREE.SphereGeometry(.6, 64, 48), new THREE.MeshPhysicalMaterial({ map: tex, roughness: .5, clearcoat: .25 }));
+  M.nucleus = new THREE.Mesh(new THREE.SphereGeometry(.12, 32, 24), nucleusMat(true)); M.nucleus.position.set(.18, .1, .28); M.nucleus.renderOrder = 5;
+  M.zona = new THREE.Mesh(new THREE.SphereGeometry(.68, 64, 48), fresnelMat("#ffe9ea", 1.3, .75));
+  M.corona = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshStandardMaterial({ color: lin("#e8ad9d"), roughness: .7, transparent: true }), 240);
+  for (let i = 0; i < 240; i++) {
+    const d = fib(i, 240).add(new THREE.Vector3(r() - .5, r() - .5, r() - .5).multiplyScalar(.12)).normalize();
+    const s = .026 + r() * .02; setInst(M.corona, i, d.clone().multiplyScalar(.74 + r() * .2), d, s, s, s * 1.4);
+  }
+  M.polar = new THREE.Mesh(new THREE.SphereGeometry(.085, 24, 16), new THREE.MeshStandardMaterial({ color: lin("#f1c6b8"), roughness: .5 }));
+  M.polar.position.copy(new THREE.Vector3(.55, .62, .2).normalize().multiplyScalar(.64));
+  M.pn = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(.1, 28, 20), nucleusMat(true)); m.renderOrder = 5; return m; });
+  // 精子：头 + 摆动的尾巴
+  M.sperm = [];
+  const headMat = new THREE.MeshStandardMaterial({ color: lin("#f5eef1"), roughness: .3 }), tailMat = new THREE.LineBasicMaterial({ color: 0xf2e6ea, transparent: true, opacity: .8 });
+  for (let i = 0; i < 12; i++) {
+    const dir = fib(i, 12), perp = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) < .9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize();
+    const head = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), headMat); head.scale.set(.022, .016, .036);
+    const tg = new THREE.BufferGeometry(); tg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(28 * 3), 3));
+    const tail = new THREE.Line(tg, tailMat);
+    M.group.add(head, tail); M.sperm.push({ dir, perp, head, tail });
+  }
+  M.cells = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 40, 28), new THREE.MeshPhysicalMaterial({ color: lin("#f4ccbc"), roughness: .42, clearcoat: .35, transparent: true, opacity: .9 }), 32);
+  M.cellNuc = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 12), nucleusMat(), 32);
+  M.blast = makeBlastocyst();
+  M.group.add(M.cyto, M.nucleus, M.zona, M.corona, M.polar, M.pn[0], M.pn[1], M.cells, M.cellNuc, M.blast);
+}
+
+function cellLayout3(n) {
+  if (n === 2) return [[[-.27, 0, 0], .3], [[.27, 0, 0], .3]];
+  if (n === 4) return [[1, 1, 1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1]].map(v => [v.map(a => a * .16), .27]);
+  if (n === 8) return [-1, 1].flatMap(a => [-1, 1].flatMap(b => [-1, 1].map(c => [[a * .19 + b * .03, b * .19, c * .19 - a * .03], .21])));
+  const out = [], outer = n === 16 ? 14 : 24, cr = n === 16 ? .16 : .125;
+  for (let i = 0; i < outer; i++) { const v = fib(i, outer).multiplyScalar(n === 16 ? .37 : .44); out.push([[v.x, v.y, v.z], cr]); }
+  for (let i = 0; i < n - outer; i++) { const v = fib(i, n - outer).multiplyScalar(.14); out.push([[v.x, v.y, v.z], cr]); }
+  return out;
+}
+
+function updateMicro(d, t) {
+  const M = G.micro, egg = d < 15;
+  M.cyto.visible = egg; M.nucleus.visible = d < 12; M.polar.visible = egg && d >= 12;
+  M.corona.visible = d < 15;
+  M.corona.material.opacity = d < 14 ? .55 + .45 * smooth(1, 13, d) : .5 * (1 - (d - 14));
+  const p = d - 14, sp = d >= 14 && d < 15;
+  M.sperm.forEach((s, i) => {
+    s.head.visible = s.tail.visible = sp;
+    if (!sp) return;
+    const dist = .92 + .5 * (.5 + .5 * Math.sin(t * .6 + i * 1.7)), h = s.dir.clone().multiplyScalar(dist);
+    s.head.position.copy(h); s.head.quaternion.setFromUnitVectors(_z, s.dir.clone().negate());
+    const a = s.tail.geometry.attributes.position;
+    for (let k = 0; k < 28; k++) {
+      const q = k / 27, w = Math.sin(q * 9 - t * 12 + i) * .045 * q;
+      a.setXYZ(k, h.x + s.dir.x * q * .6 + s.perp.x * w, h.y + s.dir.y * q * .6 + s.perp.y * w, h.z + s.dir.z * q * .6 + s.perp.z * w);
+    }
+    a.needsUpdate = true;
+    s.tail.material.opacity = .8 * (1 - smooth(.5, 1, p));
+  });
+  const pn = sp && p > .3, q = smooth(.35, 1, p);
+  M.pn.forEach((m, i) => { m.visible = pn; m.position.set((i ? .2 : -.2) * (1 - q * .65), (i ? -.03 : .03), 0); });
+  const cleave = d >= 15 && d < 19;
+  M.cells.visible = M.cellNuc.visible = cleave;
+  if (cleave) {
+    const n = d < 16 ? 2 : d < 16.8 ? 4 : d < 17.6 ? 8 : d < 18.4 ? 16 : 32, L = cellLayout3(n);
+    L.forEach(([c, r], i) => {
+      const b = 1 + .015 * Math.sin(t * 1.3 + i);
+      _p.set(c[0], c[1], c[2]); setInst(M.cells, i, _p, null, r * b);
+      _p.set(c[0] + r * .1, c[1] + r * .05, c[2] + r * .35); setInst(M.cellNuc, i, _p, null, r * .26);
+    });
+    M.cells.count = M.cellNuc.count = n;
+    M.cells.instanceMatrix.needsUpdate = M.cellNuc.instanceMatrix.needsUpdate = true;
+  }
+  const blast = d >= 19, hatch = smooth(20, 21.5, d);
+  M.blast.visible = blast;
+  if (blast) M.blast.scale.setScalar(.6 * (1 + .14 * hatch));
+  M.zona.visible = d < 21.8;
+  M.zona.scale.setScalar(1 + .07 * hatch);
+  M.zona.material.uniforms.intensity.value = .75 * (1 - .85 * hatch);
+  if (!reduceMotion) M.group.rotation.y = t * .07;
+}
+
+// 着床：子宫内膜表面（半透明）+ 下沉的囊胚 → 带绒毛的孕囊、羊膜腔、胚盘和卵黄囊
+function buildImplant3D() {
+  const I = G.implant = { group: new THREE.Group() };
+  G.scene.add(I.group);
+  const geo = new THREE.PlaneGeometry(10, 10, 150, 150); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3), r = rng(23), pits = [];
+  for (let i = 0; i < 70; i++) pits.push([r() * 10 - 5, r() * 10 - 5]);
+  const c0 = lin("#c0506a"), c1 = lin("#7c1d35"), cp = lin("#4a0c1c");
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    let y = .05 * Math.sin(x * 2.7 + 1) * Math.cos(z * 2.1) + .03 * Math.sin(x * 5.3 + z * 4.1), pit = 0;
+    for (const [px, pz] of pits) pit = Math.max(pit, Math.exp(-((x - px) ** 2 + (z - pz) ** 2) / .012));
+    y -= .05 * pit; pos.setY(i, y);
+    const c = c0.clone().lerp(c1, clamp(.5 + .5 * Math.sin(x * 1.7 + z * 2.3) * Math.cos(z * 1.1 - x), 0, 1)).lerp(cp, pit * .8);
+    cols.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
+  I.surface = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .7, transparent: true, opacity: .62, side: THREE.DoubleSide, depthWrite: false }));
+  I.deep = new THREE.Mesh(new THREE.PlaneGeometry(10, 10).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: lin("#5c1426"), roughness: .9, transparent: true, opacity: .5, depthWrite: false }));
+  I.sac = new THREE.Group();
+  I.blast = makeBlastocyst();
+  I.chorion = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 36), new THREE.MeshPhysicalMaterial({ color: lin("#d98a96"), roughness: .4, clearcoat: .4, transparent: true, opacity: .3, depthWrite: false }));
+  const cone = new THREE.ConeGeometry(.5, 1, 5); cone.translate(0, .5, 0); cone.rotateX(Math.PI / 2);
+  I.villi = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ color: lin("#e7a2a8"), roughness: .6, transparent: true }), 700);
+  for (let i = 0; i < 700; i++) { const dv = fib(i, 700); setInst(I.villi, i, dv.clone().multiplyScalar(.99), dv, .05, .05, .035 + r() * .035); }
+  I.inner = new THREE.Group();
+  const amn = new THREE.Mesh(new THREE.SphereGeometry(.3, 32, 24), fresnelMat("#ffe0e6", 1.5, .8)); amn.position.set(0, .16, 0);
+  const disc = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.MeshPhysicalMaterial({ color: lin("#f2b3ac"), roughness: .45, clearcoat: .3 })); disc.scale.set(.3, .05, .3); disc.position.set(0, -.04, 0);
+  const yolk = new THREE.Mesh(new THREE.SphereGeometry(.23, 32, 24), new THREE.MeshStandardMaterial({ color: lin("#f2cf86"), roughness: .45 })); yolk.position.set(0, -.32, 0);
+  const stalk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(.25, .02, 0), new THREE.Vector3(.55, .2, .1), new THREE.Vector3(.9, .35, .15)]), 16, .05, 8), new THREE.MeshStandardMaterial({ color: lin("#dc9aa0"), roughness: .5 }));
+  I.inner.add(amn, disc, yolk, stalk);
+  I.sac.add(I.blast, I.chorion, I.villi, I.inner);
+  I.group.add(I.deep, I.sac, I.surface);
+}
+function updateImplant(d, t) {
+  const I = G.implant, e = smooth(19.5, 24.5, d), m = smooth(23, 26.5, d);
+  const rs = lerp(.42, .8, smooth(22, 32, d));
+  I.sac.scale.setScalar(rs);
+  const surf = rs * lerp(-1.25, 1.1, e);
+  I.surface.position.y = surf; I.deep.position.y = surf - .9;
+  I.blast.visible = m < 1; I.blast.scale.setScalar(1);
+  I.blast.children.forEach(ch => { ch.material.transparent = true; if (ch.material.opacity !== undefined) ch.material.opacity = 1 - m; });
+  I.chorion.visible = I.villi.visible = I.inner.visible = m > 0;
+  I.chorion.material.opacity = .32 * m; I.villi.material.opacity = m;
+  I.inner.children.forEach(ch => { if (!ch.material.uniforms) { ch.material.transparent = m < 1; ch.material.opacity = m; } });
+  if (!reduceMotion) I.sac.rotation.y = t * .05;
+  return rs;
+}
+
+// ---------- 3D：后台网格化、逐帧更新、风格切换、比例尺 ----------
+const MS = { worker: null, inflight: null, want: null, haveDay: -1, haveRes: 0, lastInput: 0 };
+function startMesher() {
+  try {
+    const src = document.getElementById("sdfCore").textContent +
+      "\nonmessage = function (e) { var q = e.data, b = buildBody(q.d, q.res), m = b.mesh; postMessage({ key: q.key, d: q.d, res: q.res, kind: b.kind, morph: b.morph || 0, pos: m.pos, nor: m.nor, col: m.col, idx: m.idx, navel: b.navel, heart: b.heart, eyes: b.eyes, eyeR: b.eyeR, unitCRL: b.unitCRL }, [m.pos.buffer, m.nor.buffer, m.col.buffer, m.idx.buffer]); };";
+    MS.worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+    MS.worker.onmessage = e => gotBody(e.data);
+    MS.worker.onerror = () => { MS.worker = null; const j = MS.inflight; MS.inflight = null; if (j) sendJob(j); };
+  } catch (e) { MS.worker = null; }
+}
+function sendJob(job) {
+  MS.inflight = job;
+  if (MS.worker) { MS.worker.postMessage(job); return; }
+  setTimeout(() => {
+    const b = buildBody(job.d, job.res), m = b.mesh;
+    gotBody({ key: job.key, d: job.d, res: job.res, kind: b.kind, morph: b.morph || 0, pos: m.pos, nor: m.nor, col: m.col, idx: m.idx, navel: b.navel, heart: b.heart, eyes: b.eyes, eyeR: b.eyeR, unitCRL: b.unitCRL });
+  }, 0);
+}
+function gotBody(r) {
+  MS.inflight = null; MS.haveDay = r.d; MS.haveRes = r.res;
+  setBodyMesh(r); G.cordKey = "";
+  if (MS.want) { const w = MS.want; MS.want = null; if (!(w.d === MS.haveDay && w.res <= MS.haveRes)) sendJob(w); }
+}
+function wantBody(d, fast) {
+  const step = d > 52 && d < 61 ? .5 : 1, dd = Math.round(d / step) * step, res = fast ? 50 : 88;
+  if (dd === MS.haveDay && res <= MS.haveRes) return;
+  if (MS.inflight && MS.inflight.d === dd && MS.inflight.res >= res) return;
+  const job = { key: dd + ":" + res, d: dd, res };
+  if (MS.inflight) MS.want = job; else sendJob(job);
+}
+
+const SKIN = [[228, 132, 138], [236, 160, 146], [240, 182, 156]];
+function skinColor(d) {
+  const u = clamp((d - 56) / 224, 0, 1);
+  const c = u < .45 ? mix(SKIN[0], SKIN[1], u / .45) : mix(SKIN[1], SKIN[2], (u - .45) / .55);
+  return new THREE.Color(`rgb(${c[0]},${c[1]},${c[2]})`).convertSRGBToLinear();
+}
+
+function updateBody(d, t) {
+  const info = G.bodyInfo;
+  G.env.visible = true;
+  const e = smooth(29, 56, d), u = clamp((d - 56) / 224, 0, 1), us = G.style === "us";
+  // 胎盘随孕周长大
+  placePlacenta(lerp(.34, .62, smooth(30, 200, d)), lerp(.1, .2, smooth(30, 220, d)));
+  const yolkOn = d < 80 && !us;
+  G.yolk.visible = G.yolkDuct.visible = yolkOn && !!info;
+  if (!info) { G.body.visible = false; return 1; }
+  G.body.visible = true;
+  const sE = lerp(.82, 1.02, e), sF = .8 + .6 * u;
+  const s = info.kind === "embryo" ? sE : info.kind === "fetus" ? sF : lerp(sE, sF / MORPH_K, info.morph);
+  const turn = smooth(196, 245, d), act = d < 70 ? .45 : d < 210 ? 1 : lerp(1, .4, smooth(210, 280, d));
+  const th = Math.PI * turn;
+  G.body.scale.setScalar(s);
+  const sway = reduceMotion ? 0 : 1;
+  G.body.rotation.set(Math.sin(t * .27) * .04 * act * sway, 0, -th + Math.sin(t * .35) * .05 * act * sway);
+  G.body.position.set(0, Math.sin(t * .5) * .015 * sway, 0);
+
+  // 材质：早期半透明、偏红；后期饱满
+  const op = us ? 1 : info.kind === "embryo" ? .82 : lerp(.84, 1, smooth(60, 130, d));
+  G.skinMat.opacity = op; G.skinMat.transparent = op < .999; G.skinMat.depthWrite = true;
+  if (us) { G.skinMat.color.copy(lin("#d9a062")); G.skinMat.roughness = .82; G.skinMat.clearcoat = 0; }
+  else { G.skinMat.color.copy(info.kind === "embryo" ? lin("#f0c4c0") : skinColor(d)); G.skinMat.roughness = .5; G.skinMat.clearcoat = .3; }
+  G.glowMat.uniforms.color.value.set(us ? "#ffb066" : "#ff6a7a");
+  G.glowMat.uniforms.intensity.value = us ? .18 : lerp(.75, .35, smooth(56, 200, d));
+  const bpm = heartRate(d), beat = bpm ? pulse(t, bpm) : 0;
+  G.heart.visible = !!info.heart && op < .99 && bpm > 0;
+  if (G.heart.visible) { G.heart.position.fromArray(info.heart); G.heart.scale.setScalar((info.kind === "embryo" ? .075 : .05) * (1 + .2 * beat)); G.heart.material.emissiveIntensity = .5 + .8 * beat; }
+  G.eyes.forEach((m, i) => { const p = info.eyes[i]; m.visible = !!p; if (p) { m.position.fromArray(p); m.scale.setScalar(info.eyeR); } });
+
+  // 脐带和卵黄管：只在网格或姿势变化时重建
+  const ck = info.d + ":" + turn.toFixed(3) + ":" + G.vesselKey;
+  if (G.cordKey !== ck) {
+    G.cordKey = ck;
+    G.env.updateMatrixWorld(true);
+    const nav = new THREE.Vector3().fromArray(info.navel).multiplyScalar(s).applyAxisAngle(new THREE.Vector3(0, 0, 1), -th);
+    const start = G.placentaPivot.localToWorld(G.cordStartLocal.clone());
+    const ventral = new THREE.Vector3(0, 0, 1);
+    buildCord(start, nav, lerp(.022, .04, u) + .008 * (1 - e), new THREE.Vector3(1, 0, 0), ventral);
+    if (yolkOn) {
+      const yp = new THREE.Vector3(.38, -.6, .52).normalize().multiplyScalar(.8);
+      G.yolk.position.copy(yp); G.yolk.scale.setScalar(lerp(.1, .05, smooth(30, 80, d)));
+      G.yolkDuct.geometry.dispose();
+      G.yolkDuct.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([yp, yp.clone().lerp(nav, .5).add(new THREE.Vector3(.15, -.05, .1)), nav]), 32, .008, 6);
+    }
+  }
+  return seriesAt(CRL, d, true) * 10 / (s * info.unitCRL);
+}
+
+// 风格：写实 / 四维彩超（暖黄色单色，黑背景）
+function applyStyle() {
+  const us = G.style === "us";
+  G.scene.background.set(us ? "#050302" : "#12070b");
+  G.backdrop.visible = G.sac.visible = G.sacFill.visible = G.specks.visible = !us;
+  G.hemi.intensity = us ? .45 : .75; G.key.intensity = us ? 2.1 : 1.55; G.rim.color.set(us ? "#ffb070" : "#ff8098");
+  G.placentaMat.vertexColors = !us; G.placentaMat.color.copy(us ? lin("#c98a4e") : new THREE.Color(1, 1, 1)); G.placentaMat.needsUpdate = true;
+  G.vessels.visible = !us;
+  G.cordMats.vein.color.copy(lin(us ? "#c7924f" : "#8a2442")); G.cordMats.artery.color.copy(lin(us ? "#b9864a" : "#5a3c86"));
+  G.cordMats.jelly.color.copy(lin(us ? "#e0b27a" : "#efdbe2"));
+}
+
+function render3D(d, t, dt) {
+  const stage = d < 20.5 ? "micro" : d < 30.5 ? "implant" : "body";
+  if (stage !== G.stage) { G.stage = stage; flashScreen(); }
+  if (G.styleApplied !== G.style) { G.styleApplied = G.style; applyStyle(); }
+  G.micro.group.visible = stage === "micro"; G.implant.group.visible = stage === "implant"; G.env.visible = stage === "body";
+  let frameR = 1.12, mm = 1;
+  if (stage === "micro") { updateMicro(d, t); frameR = 1.05; mm = .1 / 1.2; }
+  else if (stage === "implant") { const rs = updateImplant(d, t); frameR = rs * 1.35 + .2; mm = .2 * Math.pow(25, smooth(21, 33, d)) / (2 * rs); }
+  else { wantBody(d, playing || performance.now() - MS.lastInput < 450); mm = updateBody(d, t); }
+  G.backdrop.material.uniforms.dim.value = stage === "micro" ? .55 : 1;
+  G.specks.rotation.y = t * .015; G.specks.scale.setScalar(stage === "body" ? 1 : 1.4);
+  const dist = placeCamera(frameR, dt);
+  G.renderer.render(G.scene, G.camera);
+  scale3D(mm, dist);
+}
+
+function scale3D(mmPerUnit, dist) {
+  const H = G.viewH || 1, pxPerUnit = H / (2 * Math.tan(G.camera.fov * Math.PI / 360) * dist), mmPerPx = mmPerUnit / pxPerUnit;
+  const nice = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
+  let mm = nice[0];
+  for (const n of nice) if (n / mmPerPx <= 130) mm = n;
+  $("scaleLine").style.width = (mm / mmPerPx).toFixed(1) + "px";
+  $("scaleLabel").textContent = mm < 1 ? Math.round(mm * 1000) + " µm" : mm < 10 ? mm + " mm" : mm / 10 + " cm";
+}
+function resize3D() {
+  if (!G.ok) return;
+  const r = document.getElementById("womb3d").getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  G.viewH = r.height;
+  G.renderer.setSize(r.width, r.height, false);
+  G.camera.aspect = r.width / r.height; G.camera.updateProjectionMatrix();
+}
+function flashScreen() {
+  const f = $("fade");
+  if (!f || reduceMotion) return;
+  f.classList.add("on");
+  requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("on")));
+}
+
 // ---------- 界面 ----------
 const $ = id => document.getElementById(id);
 const slider = $("day");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-let day = 1, shownDay = 0, playing = false, speed = 8, lastTs = 0, clock = 0;
+let day = 1, shownDay = 0, playing = false, speed = 8, lastTs = 0, clock = 0, lastDt = 0;
 
 const weekOf = d => Math.min(40, Math.floor(d / 7) + 1);
 const gaText = d => `孕 ${Math.floor(d / 7)} 周 + ${d % 7} 天`;
@@ -1217,20 +2083,20 @@ function updateText(d) {
 function frame(d) {
   const di = clamp(Math.round(d), 1, 280);
   if (di !== shownDay) { shownDay = di; updateText(di); if (+slider.value !== di) slider.value = di; }
-  renderWomb(clamp(d, 1, 280), clock);
+  if (G.mode3d) render3D(clamp(d, 1, 280), clock, lastDt); else renderWomb(clamp(d, 1, 280), clock);
 }
 function setDay(d) { day = clamp(d, 1, 280); frame(day); }
 
 function stop() { playing = false; $("play").textContent = "播放"; $("play").setAttribute("aria-pressed", "false"); }
 function loop(ts) {
-  const dt = lastTs ? Math.min(.1, (ts - lastTs) / 1000) : 0; lastTs = ts;
+  const dt = lastTs ? Math.min(.1, (ts - lastTs) / 1000) : 0; lastTs = ts; lastDt = dt;
   if (!reduceMotion) clock += dt;
   if (playing) { day += dt * speed; if (day >= 280) { day = 280; stop(); } }
   frame(day);
   requestAnimationFrame(loop);
 }
 
-slider.addEventListener("input", () => { stop(); setDay(+slider.value); });
+slider.addEventListener("input", () => { stop(); MS.lastInput = performance.now(); setDay(+slider.value); });
 $("play").addEventListener("click", () => {
   if (playing) return stop();
   if (day >= 280) day = 1;
@@ -1265,8 +2131,41 @@ const redrawMom = () => drawMom(shownDay || 1);
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redrawMom);
 new MutationObserver(redrawMom).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
-new ResizeObserver(() => { sizeWomb(); renderWomb(day, clock); }).observe(womb);
+// 3D / 平面切换
+function setMode(on) {
+  G.mode3d = on && G.ok;
+  $("womb3d").hidden = !G.mode3d; $("womb").hidden = G.mode3d;
+  $("hint3d").hidden = $("scale3d").hidden = !G.mode3d;
+  document.querySelectorAll(".ctl3d").forEach(el => { el.hidden = !G.mode3d; });
+  document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.mode === "3d") === G.mode3d)));
+  try { localStorage.setItem("view", G.mode3d ? "3d" : "2d"); } catch (e) {}
+  if (G.mode3d) resize3D(); else sizeWomb();
+  frame(day);
+}
+const has3d = init3D();
+if (has3d) {
+  startMesher();
+  G.style = "real";
+  setAuto(!reduceMotion);
+} else {
+  const b3 = document.querySelector('[data-mode="3d"]');
+  b3.disabled = true; b3.title = "当前浏览器无法加载 3D，已显示平面图";
+}
+document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode === "3d")));
+document.querySelectorAll("[data-style]").forEach(b => b.addEventListener("click", () => {
+  G.style = b.dataset.style;
+  document.querySelectorAll("[data-style]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+}));
+$("autoRot").addEventListener("click", () => setAuto(!G.orbit.auto));
+$("zoomIn").addEventListener("click", () => { G.orbit.zoom = clamp(G.orbit.zoom / 1.2, .45, 2.2); });
+$("zoomOut").addEventListener("click", () => { G.orbit.zoom = clamp(G.orbit.zoom * 1.2, .45, 2.2); });
+$("resetView").addEventListener("click", resetView);
+
+new ResizeObserver(() => { sizeWomb(); resize3D(); if (!G.mode3d) renderWomb(day, clock); }).observe(document.querySelector(".screen"));
 sizeWomb();
+let viewPref = null;
+try { viewPref = localStorage.getItem("view"); } catch (e) {}
+setMode(has3d && viewPref !== "2d");
 setDay(Number((location.hash.match(/^#day(\d+)$/) || [])[1]) || 1);
 requestAnimationFrame(loop);
 </script>
