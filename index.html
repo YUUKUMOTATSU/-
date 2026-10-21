@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+<title>十月怀胎模拟器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="拖动时间轴，查看胎儿从末次月经第 1 天到第 280 天预产期的发育变化，以及每周妈妈需要注意的事项。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+XiaoWei&display=swap">
+<style>
+/* 布局：左栏是固定的"宫内成像窗"加时间轴，右栏是随周数变化的说明，窄屏上下堆叠 */
+:root {
+  --bg: #F8F3F4; --surface: #FFFFFF; --surface-2: #F2E9EC; --ink: #2A1A24; --muted: #75606C; --line: #E6D7DD;
+  --accent: #B0385F; --accent-ink: #FFFFFF; --accent-soft: #F7DFE7;
+  --care: #1C7166; --care-soft: #DDEFEA; --alert: #A4461E; --alert-soft: #FBE8DE;
+  --tri1: #EDB9C7; --tri2: #DA8AA1; --tri3: #B0385F;
+  --screen: #1A0E14; --screen-ink: #F6E7ED; --screen-muted: #C8A8B5; --screen-line: rgba(246, 231, 237, .18);
+  --font-display: "ZCOOL XiaoWei", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --font-body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #150D12; --surface: #1F151B; --surface-2: #2A1E25; --ink: #F3E7ED; --muted: #B39FAB; --line: #3A2B34;
+    --accent: #EE7E9F; --accent-ink: #2A0E19; --accent-soft: #42202F;
+    --care: #6FCBBC; --care-soft: #16322D; --alert: #F29C70; --alert-soft: #3A2117;
+    --tri1: #6E3347; --tri2: #A54C69; --tri3: #EE7E9F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #150D12; --surface: #1F151B; --surface-2: #2A1E25; --ink: #F3E7ED; --muted: #B39FAB; --line: #3A2B34;
+  --accent: #EE7E9F; --accent-ink: #2A0E19; --accent-soft: #42202F;
+  --care: #6FCBBC; --care-soft: #16322D; --alert: #F29C70; --alert-soft: #3A2117;
+  --tri1: #6E3347; --tri2: #A54C69; --tri3: #EE7E9F;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 40px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; font-weight: 400; }
+p { margin: 0; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 页头 */
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px 40px; align-items: end; }
+.eyebrow { font-family: var(--font-data); font-size: 12px; letter-spacing: .12em; color: var(--accent); text-transform: uppercase; }
+.top h1 { font-family: var(--font-display); font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.1; letter-spacing: .04em; margin-top: 6px; }
+.lede { color: var(--muted); max-width: 40em; margin-top: 10px; }
+.lmp { display: grid; gap: 6px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.lmp label { font-size: 13px; color: var(--muted); }
+.lmp-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.lmp input { padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); min-width: 0; }
+.lmp-msg { font-size: 13px; color: var(--care); min-height: 1.4em; max-width: 22em; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s; }
+.btn:hover { border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn-primary:hover { filter: brightness(1.06); }
+
+/* 主体两栏 */
+.layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.viewer { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; gap: 14px; min-width: 0; }
+
+.screen { position: relative; width: 100%; aspect-ratio: 6 / 5; max-width: 100%; max-height: max(320px, calc(100vh - 290px)); border-radius: 18px; overflow: hidden; background: var(--screen); box-shadow: 0 1px 0 var(--line), 0 18px 40px -24px rgba(60, 10, 30, .55); }
+.screen canvas { display: block; width: 100%; height: 100%; }
+.hud { position: absolute; display: flex; flex-direction: column; gap: 2px; color: var(--screen-ink); pointer-events: none; text-shadow: 0 1px 6px rgba(0, 0, 0, .6); }
+.hud-tl { top: 14px; left: 16px; }
+.hud-tr { top: 14px; right: 16px; text-align: right; align-items: flex-end; }
+.hud-stage { font-family: var(--font-display); font-size: 20px; letter-spacing: .04em; }
+.hud-sub { font-family: var(--font-data); font-size: 12px; color: var(--screen-muted); }
+.hud-heart { font-family: var(--font-data); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.hud-heart i { width: 8px; height: 8px; border-radius: 50%; background: #FF6F8E; box-shadow: 0 0 8px #FF6F8E; }
+.hud-heart[hidden] { display: none; }
+
+/* 时间轴 */
+.timeline { display: grid; gap: 10px; padding: 16px 18px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.readout { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+.readout-day { font-family: var(--font-display); font-size: 30px; line-height: 1; }
+.readout-day b { font-family: var(--font-data); font-weight: 500; font-size: 32px; color: var(--accent); font-variant-numeric: tabular-nums; margin: 0 4px; }
+.readout-ga { font-family: var(--font-data); font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.track-wrap { position: relative; height: 34px; }
+.track { position: absolute; left: 0; right: 0; top: 13px; height: 8px; border-radius: 99px; overflow: hidden; display: flex; }
+.track span { height: 100%; }
+.track .t1 { background: var(--tri1); flex: 97; }
+.track .t2 { background: var(--tri2); flex: 98; }
+.track .t3 { background: var(--tri3); flex: 84; }
+.ticks { position: absolute; inset: 0; pointer-events: none; }
+.ticks i { position: absolute; top: 9px; width: 2px; height: 16px; margin-left: -1px; background: var(--surface); border-radius: 2px; opacity: .9; }
+#day { position: absolute; inset: 0; width: 100%; height: 34px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+#day::-webkit-slider-runnable-track { height: 34px; background: transparent; }
+#day::-moz-range-track { height: 34px; background: transparent; }
+#day::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: 5px; border-radius: 50%; background: var(--surface); border: 6px solid var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+#day::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 6px solid var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.tri-labels { display: flex; font-size: 12px; color: var(--muted); }
+.tri-labels span { flex: 1; }
+.tri-labels span:nth-child(1) { flex: 97; }
+.tri-labels span:nth-child(2) { flex: 98; }
+.tri-labels span:nth-child(3) { flex: 84; text-align: right; }
+
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.controls .spacer { flex: 1; }
+.speed { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.speed button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.speed button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
+.milestones { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.milestones button { flex: none; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.milestones button b { font-family: var(--font-data); font-weight: 500; color: var(--muted); margin-right: 4px; }
+.milestones button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+/* 右栏说明 */
+.info { display: grid; gap: 22px; min-width: 0; }
+.status { display: grid; gap: 8px; }
+.status-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; letter-spacing: .04em; background: var(--accent-soft); color: var(--accent); }
+.pill-quiet { background: var(--surface-2); color: var(--muted); }
+.status h2 { font-family: var(--font-display); font-size: 30px; line-height: 1.25; letter-spacing: .03em; }
+.status .summary { color: var(--muted); }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.stat { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.stat dt { font-size: 12px; color: var(--muted); }
+.stat dd { margin: 0; font-family: var(--font-data); font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat dd.text { font-family: var(--font-body); font-size: 15px; font-weight: 500; }
+
+.block { display: grid; gap: 12px; }
+.block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.block-head h3 { font-family: var(--font-display); font-size: 21px; letter-spacing: .04em; }
+.block-head span { font-size: 12px; color: var(--muted); font-family: var(--font-data); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.list li { position: relative; padding-left: 18px; max-width: 40em; }
+.list li::before { content: ""; position: absolute; left: 2px; top: .68em; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.list.care li::before { background: var(--care); }
+
+.organs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.organ { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); min-width: 0; cursor: default; }
+.organ-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.organ-name { font-weight: 500; }
+.organ-state { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.organ[data-s="1"] .organ-state { background: var(--alert-soft); color: var(--alert); }
+.organ[data-s="2"] .organ-state { background: var(--accent-soft); color: var(--accent); }
+.organ[data-s="3"] .organ-state { background: var(--care-soft); color: var(--care); }
+.bar { height: 5px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.organ[data-s="3"] .bar i { background: var(--care); }
+.organ-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+.mom { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: start; }
+.mom-fig { background: var(--surface-2); border-radius: 12px; padding: 6px; }
+.mom-fig canvas { display: block; width: 100%; height: auto; aspect-ratio: 3 / 4; }
+.mom-body { display: grid; gap: 12px; min-width: 0; }
+.mom-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 16px; margin: 0; }
+.mom-facts div { display: grid; gap: 0; }
+.mom-facts dt { font-size: 12px; color: var(--muted); }
+.mom-facts dd { margin: 0; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.check { display: inline-flex; gap: 6px; align-items: baseline; padding: 4px 10px; border-radius: 10px; background: var(--care-soft); color: var(--care); font-size: 13px; }
+.check b { font-family: var(--font-data); font-weight: 500; font-size: 12px; }
+.check.next { background: var(--surface-2); color: var(--muted); }
+
+.warn { padding: 14px 16px; border-radius: var(--radius); background: var(--alert-soft); color: var(--ink); display: grid; gap: 8px; }
+.warn h3 { font-family: var(--font-display); font-size: 19px; color: var(--alert); letter-spacing: .04em; }
+.warn ul { margin: 0; padding-left: 1.2em; display: grid; gap: 3px; }
+.foot { font-size: 12px; color: var(--muted); max-width: 60em; }
+
+@media (max-width: 960px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .viewer { position: static; }
+  .top { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mom { grid-template-columns: minmax(0, 1fr); }
+  .mom-fig { max-width: 180px; }
+  .status h2 { font-size: 25px; }
+  .readout-day { font-size: 24px; }
+  .readout-day b { font-size: 26px; }
+  .hud-stage { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar i { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">280 天 · 40 周 · 胎儿发育模拟</p>
+      <h1>十月怀胎模拟器</h1>
+      <p class="lede">拖动时间轴，从末次月经第 1 天一直看到第 280 天的预产期。左边的画面随天数变化，右边告诉你这一周宝宝在长什么、妈妈要注意什么。</p>
+    </div>
+    <form class="lmp" id="lmpForm">
+      <label for="lmp">输入末次月经第一天，直接跳到今天</label>
+      <div class="lmp-row">
+        <input type="date" id="lmp" name="lmp">
+        <button class="btn btn-primary" type="submit">定位到今天</button>
+      </div>
+      <p class="lmp-msg" id="lmpMsg" aria-live="polite"></p>
+    </form>
+  </header>
+
+  <main class="layout">
+    <section class="viewer" aria-label="胎儿发育画面与时间轴">
+      <div class="screen">
+        <canvas id="womb" role="img" aria-label="胎儿发育示意动画"></canvas>
+        <div class="hud hud-tl">
+          <span class="hud-stage" id="hudStage">卵泡发育</span>
+          <span class="hud-sub" id="hudView">显微视野</span>
+        </div>
+        <div class="hud hud-tr">
+          <span class="hud-heart" id="hudHeart" hidden><i></i><span id="hudBpm">—</span></span>
+          <span class="hud-sub" id="hudAge"></span>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="readout">
+          <span class="readout-day">第<b id="dayNum">1</b>天</span>
+          <span class="readout-ga" id="gaText">孕 0 周 + 1 天 · 距预产期 279 天</span>
+        </div>
+        <div class="track-wrap">
+          <div class="track" aria-hidden="true"><span class="t1"></span><span class="t2"></span><span class="t3"></span></div>
+          <div class="ticks" id="ticks" aria-hidden="true"></div>
+          <input type="range" id="day" min="1" max="280" step="1" value="1" aria-label="怀孕天数">
+        </div>
+        <div class="tri-labels" aria-hidden="true"><span>孕早期 1–13 周</span><span>孕中期 14–27 周</span><span>孕晚期 28–40 周</span></div>
+        <div class="controls">
+          <button class="btn btn-primary" id="play" type="button" aria-pressed="false">播放</button>
+          <div class="speed" role="group" aria-label="播放速度">
+            <button type="button" data-speed="3" aria-pressed="false">慢</button>
+            <button type="button" data-speed="8" aria-pressed="true">中</button>
+            <button type="button" data-speed="20" aria-pressed="false">快</button>
+          </div>
+          <span class="spacer"></span>
+          <button class="btn" type="button" data-step="-7">−1 周</button>
+          <button class="btn" type="button" data-step="-1">−1 天</button>
+          <button class="btn" type="button" data-step="1">+1 天</button>
+          <button class="btn" type="button" data-step="7">+1 周</button>
+        </div>
+        <div class="milestones" id="milestones" aria-label="关键节点"></div>
+      </div>
+    </section>
+
+    <section class="info" aria-live="polite">
+      <div class="status">
+        <div class="status-row">
+          <span class="pill" id="triPill">孕早期</span>
+          <span class="pill pill-quiet" id="weekPill">怀孕第 1 周</span>
+        </div>
+        <h2 id="stageTitle">月经期，还没有受孕</h2>
+        <p class="summary" id="stageSummary"></p>
+      </div>
+
+      <dl class="stats">
+        <div class="stat"><dt id="lenLabel">身长</dt><dd id="lenVal">—</dd></div>
+        <div class="stat"><dt>体重</dt><dd id="wtVal">—</dd></div>
+        <div class="stat"><dt>大小相当于</dt><dd class="text" id="fruitVal">—</dd></div>
+        <div class="stat"><dt>受精后</dt><dd id="pfVal">—</dd></div>
+      </dl>
+
+      <div class="block">
+        <div class="block-head"><h3>这一周，宝宝在发育什么</h3><span id="devWeek">第 1 周</span></div>
+        <ul class="list" id="devList"></ul>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><h3>器官发育进度</h3><span>按孕龄估算，仅作示意</span></div>
+        <div class="organs" id="organs"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><h3>妈妈需要注意</h3><span id="momWeek">第 1 周</span></div>
+        <div class="mom">
+          <div class="mom-fig"><canvas id="momCv" width="300" height="400" role="img" aria-label="妈妈腹部与子宫大小示意"></canvas></div>
+          <div class="mom-body">
+            <dl class="mom-facts">
+              <div><dt>宫底高度</dt><dd id="fundus">—</dd></div>
+              <div><dt>参考增重（孕前体重正常）</dt><dd id="gain">—</dd></div>
+              <div><dt>子宫大小</dt><dd id="uterus">—</dd></div>
+            </dl>
+            <ul class="list care" id="momList"></ul>
+          </div>
+        </div>
+        <div class="block-head"><h3>产检安排</h3><span>以所在医院要求为准</span></div>
+        <div class="checks" id="checks"></div>
+      </div>
+
+      <div class="warn">
+        <h3>任何时候出现这些情况，请立即就医</h3>
+        <ul>
+          <li>阴道出血，或下腹剧烈、持续疼痛</li>
+          <li>阴道突然流出较多液体（可能是破水）</li>
+          <li>孕 28 周后胎动明显减少或 2 小时少于 10 次</li>
+          <li>剧烈头痛、视物模糊、上腹痛、手脸突然肿胀</li>
+          <li>发烧 38℃ 以上，或剧烈呕吐无法进食饮水</li>
+          <li>37 周前出现规律宫缩</li>
+        </ul>
+      </div>
+
+      <p class="foot">画面为示意动画，尺寸、体重为常见参考值，每个宝宝都会有差异。孕周按末次月经第一天开始计算（受精约在第 14 天）。本页仅作科普，不能替代医生的检查和建议。</p>
+    </section>
+  </main>
+</div>
+<script>
+// 每周内容：t 标题，f 大小比喻，dev 胎儿发育，mom 妈妈注意事项
+const WEEKS = [null,
+  { t: "月经期，还没有受孕", f: "还没有受孕",
+    dev: ["孕周从末次月经第一天开始算，这一周卵子还没有排出，也没有受精。", "卵巢里有一批卵泡在激素作用下开始发育，最后通常只有一个会成熟。"],
+    mom: ["备孕阶段每天补充 0.4 mg 叶酸，最好从孕前 3 个月开始。", "戒烟戒酒，远离二手烟；吃药前先问医生。", "记下这次月经的第一天，用来推算预产期。"] },
+  { t: "卵泡成熟，准备排卵", f: "卵子直径约 0.1 mm",
+    dev: ["优势卵泡长到约 2 cm，大约在第 14 天破裂排卵。", "卵子直径约 0.1 mm，是人体最大的细胞之一，排出后只有 12–24 小时可以受精。", "受精通常发生在输卵管靠近卵巢的一段（壶腹部）。"],
+    mom: ["排卵前后两三天是最容易受孕的时间。", "保持规律作息和适量运动，把体重控制在正常范围。"] },
+  { t: "受精，受精卵开始分裂", f: "一个针尖",
+    dev: ["精子和卵子结合成受精卵，宝宝的性别在这一刻就由精子决定了。", "受精约 30 小时后开始分裂：2 个细胞、4 个、8 个，再到实心的桑椹胚。", "一边分裂一边沿输卵管移向子宫，受精后约 5 天变成中间有空腔的囊胚。", "本周末（受精后 6–7 天）囊胚开始钻进子宫内膜，这叫着床。"],
+    mom: ["这时还测不出怀孕，有人在着床时会有一点点褐色或粉色分泌物。", "尽量避免 X 光检查、高温桑拿和自行用药。"] },
+  { t: "着床完成，三个胚层出现", f: "一粒罂粟籽",
+    dev: ["胚胎分成外、中、内三个胚层：外胚层长成皮肤和神经，中胚层长成肌肉、骨骼和心血管，内胚层长成肠胃、肝、肺等内脏。", "胎盘和羊膜囊开始形成，卵黄囊先为胚胎提供营养。", "胚胎只有 0.1–0.2 mm 长。"],
+    mom: ["月经推迟了，验孕棒可能出现浅浅的第二条线，抽血查 HCG 更准。", "继续每天吃叶酸；乳房胀痛、容易累都是常见的早期变化。"] },
+  { t: "神经管形成，心管出现", f: "一粒芝麻",
+    dev: ["神经管开始形成并逐渐闭合，以后长成大脑和脊髓。", "原始心管形成，本周末前后开始搏动。", "B 超可以看到孕囊，里面有一个小小的卵黄囊。"],
+    mom: ["叶酸对预防神经管缺陷最关键的就是这几周，不要漏服。", "可能出现恶心、尿频、嗜睡等早孕反应。", "建议孕 6–8 周做第一次 B 超，确认是宫内妊娠。"] },
+  { t: "心脏开始跳动", f: "一颗扁豆",
+    dev: ["心脏开始有节律地跳动，每分钟约 100–120 次，阴道 B 超可能看到闪烁的胎心。", "头部明显变大，眼睛、耳朵的雏形出现，手臂的芽冒出来。", "神经管在本周闭合。身体弯成 C 形，还带着一条小尾巴。"],
+    mom: ["孕吐常在这时开始：少吃多餐，起床前吃几块苏打饼干会好一些。", "吐得吃不下、喝不进，或者尿很少，要去医院（警惕妊娠剧吐）。"] },
+  { t: "大脑快速分区，腿芽出现", f: "一颗蓝莓",
+    dev: ["大脑分出前脑、中脑、后脑三个部分，发育速度非常快。", "腿芽出现；手臂末端变扁，像小船桨，以后会分出手指。", "肾脏、肝脏和肠道开始形成。"],
+    mom: ["不吃生食：生鱼片、溏心蛋、未消毒的奶，预防李斯特菌和弓形虫。", "家里有猫的话，让家人负责清理猫砂。"] },
+  { t: "手指脚趾分开，尾巴消失", f: "一颗覆盆子",
+    dev: ["手指、脚趾开始分开，指间还连着一层蹼。", "小尾巴逐渐消失；眼睑、鼻尖和上唇成形。", "所有主要器官都已经开始发育，胚胎期就要结束了。"],
+    mom: ["多数人会在这一周前后做第一次 B 超，看到胎芽和胎心。", "这几周是致畸最敏感的时期，任何药物都要遵医嘱。"] },
+  { t: "从胚胎变成胎儿", f: "一颗樱桃",
+    dev: ["从这周起正式叫\"胎儿\"了，外形已经能看出是个小人。", "肌肉开始发育，会做细小的动作，但妈妈还感觉不到。", "眼睑长长，开始盖住眼睛，接下来会闭合到 26 周左右。"],
+    mom: ["腰身可能开始变粗，可以换宽松的衣服。", "着手准备建档，各地医院一般要求孕 12 周前后完成。"] },
+  { t: "四个心腔发育完成", f: "一颗金桔",
+    dev: ["心脏的四个腔室发育完成。", "手指脚趾完全分开，开始长出指甲床。", "骨头开始从软骨变硬（骨化）。"],
+    mom: ["可以先和医生商量孕早中期的筛查安排：NT、唐筛、无创 DNA。", "多喝水、多吃蔬菜，预防便秘。"] },
+  { t: "会做呼吸样的动作", f: "一颗无花果",
+    dev: ["头约占身长的一半；横膈膜形成，胸部开始有类似呼吸的起伏。", "牙床里出现了乳牙的牙胚。", "外生殖器开始分化。"],
+    mom: ["孕 11 周到 13 周 6 天做 NT 检查（测颈后透明层厚度），评估染色体异常风险。", "早孕反应多在这几周最重，之后会慢慢减轻。"] },
+  { t: "出现反射，开始产生尿液", f: "一个青柠",
+    dev: ["出现反射：手指会张开握拢，脚趾会蜷起，嘴巴会做吮吸动作。", "肾脏开始产生尿液，排到羊水里。", "两只眼睛从头的两侧往前靠拢，脸越来越像人脸。"],
+    mom: ["孕早期快结束了，流产风险明显下降。", "完成 NT 检查和建档，做全套孕期血液检查。"] },
+  { t: "孕早期最后一周", f: "一个豌豆荚",
+    dev: ["声带开始形成。", "原本有一部分在脐带里的肠子回到了腹腔。", "指尖开始出现皮纹，这是指纹的雏形。"],
+    mom: ["胃口常在这时恢复，饮食注意多样均衡。", "多吃富含铁和钙的食物，需要补充铁剂、钙剂的听医生安排。"] },
+  { t: "进入孕中期，会做鬼脸了", f: "一个柠檬",
+    dev: ["脖子变长，头能抬起来；会皱眉、眯眼，做各种表情。", "全身开始长出细软的胎毛（毳毛）。", "甲状腺开始分泌激素。"],
+    mom: ["肚子开始微微隆起。", "可以开始规律运动：散步、孕妇瑜伽、游泳都合适，每周累计约 150 分钟。"] },
+  { t: "骨骼变硬，能感知光线", f: "一个苹果",
+    dev: ["骨骼继续硬化，B 超下能看得很清楚。", "眼睛虽然闭着，已经能感觉到光线明暗。", "腿开始比手臂长。"],
+    mom: ["孕 15–20 周可以做中孕期唐氏筛查；高龄或高风险可选无创 DNA 或羊水穿刺。", "刷牙时牙龈出血很常见，用软毛牙刷，必要时看牙医。"] },
+  { t: "眼睛会转，开始翻身", f: "一个牛油果",
+    dev: ["眼球可以在眼睑下慢慢转动。", "心跳有力，每分钟约 120–160 次。", "在羊水里频繁翻身、伸展。"],
+    mom: ["生过孩子的妈妈可能这时就感觉到胎动，像小鱼吐泡泡。", "避免长时间平躺，开始练习左侧卧睡。"] },
+  { t: "皮下开始储存脂肪", f: "一个洋葱",
+    dev: ["皮下开始积累脂肪。", "汗腺开始形成。", "脐带变得更粗壮，输送更多营养。"],
+    mom: ["体重增长加快，孕中晚期每周增重约 0.4 kg 比较合适。", "鼻塞、流鼻血较常见，是激素和血容量增加引起的。"] },
+  { t: "能听到声音了", f: "一个甜椒",
+    dev: ["耳朵移到最终位置，开始能听到妈妈的心跳、肠鸣和说话声。", "指纹基本形成。", "如果是女孩，子宫和输卵管已经形成。"],
+    mom: ["第一次怀孕的妈妈常在 18–20 周第一次感到胎动。", "可以开始和宝宝说说话、放些轻柔的音乐。"] },
+  { t: "胎脂出现，五感分区", f: "一个芒果",
+    dev: ["皮肤表面开始覆盖一层白色的胎脂，防止皮肤被羊水泡皱。", "大脑里负责嗅觉、味觉、听觉、视觉和触觉的区域开始分化。"],
+    mom: ["腰背痛、腹股沟一侧的牵拉痛（圆韧带痛）很常见。", "穿平底鞋；捡东西时先屈膝蹲下，不要直接弯腰。"] },
+  { t: "孕期过半", f: "一根香蕉",
+    dev: ["从这周起改为测量头顶到脚跟的身长，所以数字一下子变大了。", "会吞咽羊水，肠道里开始积聚胎便。", "头发和眉毛开始长出来。"],
+    mom: ["宫底大约到了肚脐的高度。", "孕 20–24 周做系统 B 超（大排畸），全面检查胎儿的结构。"] },
+  { t: "胎动越来越明显", f: "一根胡萝卜",
+    dev: ["胎动越来越有力，有时能看到肚皮被踢起一个小包。", "骨髓开始参与造血。"],
+    mom: ["下肢水肿、静脉曲张变多，休息时把腿垫高。", "注意补铁，预防孕期贫血。"] },
+  { t: "会摸脸、抓脐带", f: "一个木瓜",
+    dev: ["嘴唇、眼睑、眉毛更清晰，牙龈下的牙胚继续发育。", "有了触觉，会用手摸自己的脸、抓脐带。"],
+    mom: ["可能开始长妊娠纹，保持皮肤滋润，控制体重增长的速度。", "出现规律的肚子发紧、阴道流液，要及时去医院。"] },
+  { t: "能分辨妈妈的声音", f: "一个西柚",
+    dev: ["肺里的血管快速发育，为出生后呼吸做准备。", "皮肤还是半透明、皱巴巴的，脂肪正在积累。", "能听出并记住妈妈的声音。"],
+    mom: ["孕 24–28 周要做糖耐量检查（OGTT），可以先了解空腹等要求。", "少吃甜食和精米白面，搭配粗粮和蔬菜。"] },
+  { t: "肺开始分泌表面活性物质", f: "一根玉米",
+    dev: ["肺开始分泌表面活性物质，出生后肺泡才能张开。", "内耳发育完成，能感觉到自己是头朝上还是头朝下。", "在条件好的新生儿重症监护下，这时出生已有一定的存活机会。"],
+    mom: ["孕 24–28 周做 OGTT，筛查妊娠期糖尿病。", "开始留意宝宝的胎动规律：什么时候动得多。"] },
+  { t: "皮肤变光滑，鼻孔打开", f: "一棵花椰菜",
+    dev: ["皮下脂肪增多，皮肤开始舒展变光滑。", "鼻孔打开，开始用羊水练习\"呼吸\"。", "头发的颜色和质地开始显现。"],
+    mom: ["烧心、反酸比较常见，饭后不要马上躺下。", "睡觉时左侧卧，两腿之间夹个枕头会舒服些。"] },
+  { t: "眼睛睁开了", f: "一颗生菜",
+    dev: ["眼睑分开，眼睛开始睁开、会眨眼。", "对声音和光线有反应，听到很大的响声会吓一跳。"],
+    mom: ["留意血压：头痛、视物模糊、浮肿突然加重，要警惕子痫前期。", "可以开始了解分娩方式和母乳喂养。"] },
+  { t: "大脑活动明显增加", f: "一颗卷心菜",
+    dev: ["大脑活动明显增加，可能已经开始做梦（快速眼动睡眠）。", "肺、肝和免疫系统继续成熟。"],
+    mom: ["小腿抽筋多见：注意补钙，睡前拉伸小腿。", "孕晚期产检会变成两周一次。"] },
+  { t: "进入孕晚期", f: "一个茄子",
+    dev: ["眼睛能睁能闭，长出了睫毛。", "大脑表面开始出现沟回，神经系统快速成熟。", "体重突破 1 kg。"],
+    mom: ["每天数胎动：一般 2 小时内不少于 10 次，明显减少要立即就医。", "Rh 阴性血型的妈妈，医生可能安排注射抗 D 免疫球蛋白。"] },
+  { t: "骨骼需要大量钙", f: "一个小南瓜",
+    dev: ["肌肉和肺继续成熟，头部为容纳快速长大的大脑而变大。", "骨骼基本形成但还比较软，需要大量钙。"],
+    mom: ["每天钙摄入约 1000 mg：牛奶、豆制品、深绿色蔬菜都是好来源。", "便秘、痔疮常见，多吃蔬菜水果，多喝水。"] },
+  { t: "胎毛开始脱落", f: "一棵大白菜",
+    dev: ["骨髓全面负责制造红细胞。", "胎毛开始脱落，脂肪让皮肤显得饱满。"],
+    mom: ["子宫顶到膈肌，容易气短，放慢节奏多休息。", "可以开始准备待产包了。"] },
+  { t: "五种感官都在工作", f: "一个椰子",
+    dev: ["视觉、听觉、触觉、味觉、嗅觉都已经能工作。", "会转头，动作更协调，体重快速增加。"],
+    mom: ["可能出现假性宫缩：不规律、不怎么痛，休息后缓解。", "如果宫缩变得规律、越来越强，及时就医。"] },
+  { t: "多数宝宝转为头朝下", f: "一个菠萝",
+    dev: ["手指甲、脚趾甲都长好了。", "多数宝宝开始转成头朝下的姿势。", "每天练习吞咽、呼吸和吮吸。"],
+    mom: ["孕 28–36 周每两周产检一次，32–34 周常复查 B 超看胎位和生长。", "胎位还不正也别太担心，36 周前后医生会再评估。"] },
+  { t: "头骨保持柔软", f: "一个榴莲",
+    dev: ["头骨还没有完全闭合，出生时可以轻微变形通过产道。", "从妈妈那里获得抗体，免疫系统逐步建立。"],
+    mom: ["阴道突然流液（可能是破水）：立即平躺，尽快去医院。", "学习分娩时的呼吸方法，了解产程。"] },
+  { t: "早产也大多预后良好", f: "一个哈密瓜",
+    dev: ["中枢神经系统和肺继续成熟，这时出生的宝宝大多预后良好。", "皮下脂肪增厚，帮助出生后保持体温。"],
+    mom: ["视物模糊、持续头痛、上腹痛，要警惕子痫前期，立即就医。", "确认去医院的路线、时间和联系方式。"] },
+  { t: "空间变挤，胎动变成翻滚", f: "一个大柚子",
+    dev: ["空间越来越挤，胎动从拳打脚踢变成翻滚蠕动，但次数不应明显减少。", "肾脏发育完全，肝脏能处理一部分代谢废物。"],
+    mom: ["孕 35–37 周做 B 族链球菌（GBS）筛查（部分医院）。", "尿频再次明显，夜里起夜增多。"] },
+  { t: "头朝下，准备入盆", f: "一个小冬瓜",
+    dev: ["胎毛大部分脱落，胎脂变厚。", "多数宝宝头朝下进入骨盆，准备出生。"],
+    mom: ["36 周起每周产检一次，开始做胎心监护（NST）。", "备好待产包和证件，认识临产信号：规律宫缩、见红、破水。"] },
+  { t: "早期足月", f: "一个大南瓜",
+    dev: ["37 周起就算足月（早期足月），器官基本成熟。", "练习抓握、吮吸，会转头寻找光源。"],
+    mom: ["胎头入盆后呼吸轻松一些，但尿频更明显。", "见红后，如果宫缩变得规律（约 5 分钟一次），准备去医院。"] },
+  { t: "随时可能出生", f: "一个小西瓜",
+    dev: ["肠道里的胎便越积越多，出生后 1–2 天排出。", "声带发育好了，出生后就能大声哭。"],
+    mom: ["适当散步有助于胎头入盆，同时保证休息。", "破水后平躺，垫干净的护垫，立即去医院。"] },
+  { t: "完全足月", f: "一个中等西瓜",
+    dev: ["39–40 周是完全足月。", "大脑仍在快速发育，出生后还会继续长。"],
+    mom: ["手机保持畅通，家人随时待命。", "正常吃饭，储备体力。"] },
+  { t: "预产期到了", f: "一个大西瓜",
+    dev: ["只有约 5% 的宝宝恰好在预产期当天出生，前后两周都很正常。", "宝宝身长约 50 cm，体重约 3.3–3.5 kg。"],
+    mom: ["过了预产期还没动静不用慌，按医生要求加强监护。", "一般在 41 周左右医生会考虑引产，避免超过 42 周。"] }
+];
+
+// 按周的尺寸参考：头臀长 CRL（cm，20 周前）和顶踵长 CH（cm，20 周起），体重 g
+const LEN = [0, 0.01, 0.01, 0.015, 0.1, 0.2, 0.5, 1.0, 1.6, 2.3, 3.1, 4.1, 5.4, 7.4, 8.7, 10.1, 11.6, 13, 14.2, 15.3,
+  25.6, 26.7, 27.8, 28.9, 30, 34.6, 35.6, 36.6, 37.6, 38.6, 39.9, 41.1, 42.4, 43.7, 45, 46.2, 47.4, 48.6, 49.8, 50.7, 51.2];
+const WT = [0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 4, 7, 14, 23, 43, 70, 100, 140, 190, 240,
+  300, 360, 430, 501, 600, 660, 760, 875, 1005, 1153, 1319, 1502, 1702, 1918, 2146, 2383, 2622, 2859, 3083, 3288, 3462];
+
+// 器官：开始形成、具备基本功能、基本成熟的孕龄天数，以及三个阶段的说明
+const ORGANS = [
+  { n: "心脏", a: 33, b: 70, c: 259, note: ["原始心管正在形成", "已经在跳动，四个心腔逐步长好", "结构完整，随身体一起长大"] },
+  { n: "大脑与脊髓", a: 29, b: 42, c: 280, note: ["神经管正在形成、闭合", "大脑分区、长出沟回，神经细胞大量增加", "出生后还会继续发育多年"] },
+  { n: "眼睛", a: 36, b: 84, c: 196, note: ["视泡出现，眼睛的雏形", "结构成形，眼睑闭合保护眼球", "眼睛已睁开，能感知光线"] },
+  { n: "耳朵与听觉", a: 38, b: 126, c: 182, note: ["耳朵的雏形出现", "外耳成形，开始能听到声音", "能分辨妈妈的声音"] },
+  { n: "四肢", a: 40, b: 70, c: 245, note: ["肢芽冒出", "手指脚趾分开，会伸展踢腿", "肌肉有力，动作协调"] },
+  { n: "肺", a: 36, b: 168, c: 252, note: ["肺芽出现，开始分支", "支气管和肺泡发育，24 周起分泌表面活性物质", "基本成熟，出生后能自主呼吸"] },
+  { n: "肾脏", a: 40, b: 84, c: 245, note: ["肾脏开始形成", "开始产生尿液，参与形成羊水", "发育完全"] },
+  { n: "消化系统", a: 43, b: 140, c: 259, note: ["肠道、肝脏开始形成", "会吞咽羊水，肠道积聚胎便", "可以消化母乳"] },
+  { n: "骨骼", a: 56, b: 140, c: 280, note: ["软骨开始骨化", "骨骼逐渐变硬，需要大量钙", "骨骼基本形成，头骨保持柔软便于分娩"] },
+  { n: "皮肤与脂肪", a: 50, b: 133, c: 266, note: ["皮肤很薄、透明", "长出胎毛和胎脂，开始储存脂肪", "皮下脂肪充足，皮肤饱满"] },
+  { n: "生殖器官", a: 50, b: 98, c: 252, note: ["生殖腺开始分化", "外生殖器可分辨（B 超通常 16 周后更清楚）", "发育基本完成"] }
+];
+
+// 时间轴上的关键节点（孕龄天数）
+const MILESTONES = [
+  { d: 14, t: "排卵受精" }, { d: 20, t: "着床" }, { d: 36, t: "心跳" }, { d: 56, t: "成为胎儿" },
+  { d: 84, t: "NT 检查" }, { d: 98, t: "孕中期" }, { d: 126, t: "感到胎动" }, { d: 154, t: "大排畸" },
+  { d: 168, t: "糖耐量" }, { d: 182, t: "睁眼" }, { d: 196, t: "孕晚期" }, { d: 252, t: "头朝下入盆" },
+  { d: 259, t: "足月" }, { d: 280, t: "预产期" }
+];
+
+// 产检：适用的孕龄天数范围
+const CHECKS = [
+  { a: 42, b: 62, w: "6–8 周", t: "首次 B 超：确认宫内孕、看胎心胎芽" },
+  { a: 77, b: 97, w: "11–13⁺⁶ 周", t: "NT 检查、建档、孕早期血液检查" },
+  { a: 84, b: 160, w: "12–22⁺⁶ 周", t: "无创 DNA（按需选择）" },
+  { a: 105, b: 139, w: "15–20 周", t: "中孕期唐氏筛查" },
+  { a: 140, b: 167, w: "20–24 周", t: "系统 B 超（大排畸）" },
+  { a: 168, b: 195, w: "24–28 周", t: "糖耐量 OGTT" },
+  { a: 196, b: 251, w: "28–36 周", t: "每两周产检，32–34 周复查 B 超" },
+  { a: 245, b: 258, w: "35–37 周", t: "B 族链球菌筛查" },
+  { a: 252, b: 300, w: "36 周起", t: "每周产检 + 胎心监护" }
+];
+
+// 画面左上角显示的阶段
+function stageOf(d) {
+  if (d < 14) return { n: "卵泡发育", s: "孕周从末次月经第一天算起。这时还没有受孕，卵巢里的卵泡正在长大。" };
+  if (d < 15) return { n: "排卵与受精", s: "卵子排出后进入输卵管，上亿个精子里只有一个能进入卵子。" };
+  if (d < 19) return { n: "受精卵分裂", s: "受精卵一边分裂一边向子宫移动，细胞数不断翻倍，但总大小几乎不变。" };
+  if (d < 21) return { n: "囊胚", s: "细胞分成两部分：外层将来变成胎盘，内部一小团细胞将来长成宝宝。" };
+  if (d < 28) return { n: "着床", s: "囊胚钻进子宫内膜，和妈妈建立联系，胚胎分化出三个胚层。" };
+  if (d < 56) return { n: "胚胎期", s: "所有主要器官都在这几周开始形成，是对药物、辐射最敏感的时期。" };
+  if (d < 98) return { n: "胎儿期 · 孕早期", s: "器官已经各就各位，接下来主要是长大和完善功能。" };
+  if (d < 196) return { n: "孕中期", s: "宝宝快速长大，开始有听觉、表情和明显的胎动，妈妈的肚子也显出来了。" };
+  if (d < 259) return { n: "孕晚期", s: "宝宝主要在长肉、成熟肺和大脑，空间越来越挤，多数转为头朝下。" };
+  return { n: "足月", s: "宝宝已经准备好了，随时可能出生。" };
+}
+
+// ---------- 工具 ----------
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function circ(c, x, y, r) { c.moveTo(x + r, y); c.arc(x, y, Math.max(0, r), 0, TAU); }
+function mix(a, b, t) { return a.map((v, i) => Math.round(lerp(v, b[i], t))); }
+const rgb = (a, al = 1) => `rgba(${a[0]},${a[1]},${a[2]},${al})`;
+function pulse(t, bpm) { const ph = (t * bpm / 60) % 1; return Math.exp(-ph * 7); }
+
+// 头臀长（cm）与顶踵长（cm）：20 周前后测量方式不同，各补一条连续曲线用于插值
+const CRL = LEN.map((v, w) => w < 20 ? v : v * lerp(0.64, 0.70, (w - 20) / 20));
+const CH = LEN.map((v, w) => w < 20 ? v / 0.64 : v);
+function seriesAt(arr, d, geo) {
+  const w = (d + 3.5) / 7, i = clamp(Math.floor(w), 1, 39), t = clamp(w - i, 0, 1);
+  const a = arr[i], b = arr[i + 1];
+  return geo && a > 0 && b > 0 ? a * Math.pow(b / a, t) : lerp(a, b, t);
+}
+function heartRate(d) {
+  if (d < 36) return 0;
+  if (d < 63) return Math.round(lerp(105, 170, smooth(36, 63, d)));
+  return Math.round(lerp(170, 140, smooth(63, 200, d)));
+}
+
+// 比例尺：选一个 50–130 px 之间的整齐长度
+function scaleBar(c, mmPerPx, W, H) {
+  const nice = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
+  let mm = nice[0];
+  for (const n of nice) if (n / mmPerPx <= 130) mm = n;
+  const px = mm / mmPerPx, x = W - 18 - px, y = H - 20;
+  const label = mm < 1 ? Math.round(mm * 1000) + " µm" : mm < 10 ? mm + " mm" : mm / 10 + " cm";
+  c.save();
+  c.strokeStyle = "rgba(246,231,237,.85)"; c.lineWidth = 2; c.lineCap = "round";
+  c.beginPath(); c.moveTo(x, y); c.lineTo(x + px, y); c.moveTo(x, y - 5); c.lineTo(x, y + 5); c.moveTo(x + px, y - 5); c.lineTo(x + px, y + 5); c.stroke();
+  c.fillStyle = "rgba(246,231,237,.9)"; c.font = '500 12px "IBM Plex Mono", ui-monospace, monospace'; c.textAlign = "center";
+  c.fillText(label, x + px / 2, y - 10);
+  c.textAlign = "left"; c.fillStyle = "rgba(246,231,237,.55)"; c.font = '12px "Noto Sans SC", sans-serif';
+  c.fillText("示意图 · 比例为近似值", 16, H - 16);
+  c.restore();
+}
+
+function specks(c, W, H, t, n, col, seed, cx, cy, R) {
+  const r = rng(seed);
+  c.fillStyle = col; c.beginPath();
+  for (let i = 0; i < n; i++) {
+    let x, y;
+    if (R) { const a = r() * TAU + t * 0.02 * (r() - 0.5), rr = Math.sqrt(r()) * R * 0.95; x = cx + Math.cos(a) * rr; y = cy + Math.sin(a) * rr + Math.sin(t * 0.4 + i) * 3; }
+    else { x = (r() * W + t * 5 * (0.3 + r())) % W; y = r() * H + Math.sin(t * 0.3 + i) * 6; }
+    circ(c, x, y, 0.8 + r() * 2.2);
+  }
+  c.fill();
+}
+
+// ---------- 显微视野：卵子、受精、分裂、囊胚 ----------
+function microBackdrop(c, W, H, t) {
+  const g = c.createRadialGradient(W * .5, H * .5, 0, W * .5, H * .5, Math.max(W, H) * .75);
+  g.addColorStop(0, "#4a1a2b"); g.addColorStop(.6, "#2a0e19"); g.addColorStop(1, "#13070c");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  specks(c, W, H, t, 55, "rgba(255,200,215,.08)", 7);
+}
+
+function drawZona(c, cx, cy, R, gapA, gap, alpha) {
+  c.save(); c.globalAlpha = alpha;
+  c.beginPath(); c.arc(cx, cy, R * 1.13, gapA + gap, gapA + TAU);
+  c.lineWidth = R * 0.11; c.strokeStyle = "rgba(255,225,222,.16)"; c.stroke();
+  c.lineWidth = Math.max(1, R * 0.015); c.strokeStyle = "rgba(255,228,226,.45)";
+  c.beginPath(); c.arc(cx, cy, R * 1.185, gapA + gap, gapA + TAU); c.stroke();
+  c.beginPath(); c.arc(cx, cy, R * 1.075, gapA + gap, gapA + TAU); c.stroke();
+  c.restore();
+}
+
+function drawOvum(c, cx, cy, R, t, corona) {
+  if (corona > 0) {
+    const r = rng(11);
+    c.save(); c.globalAlpha = corona;
+    for (let ring = 1; ring >= 0; ring--) {
+      const n = ring ? 32 : 24, rr = R * (ring ? 1.55 : 1.32);
+      c.beginPath();
+      for (let i = 0; i < n; i++) {
+        const a = i / n * TAU + ring * 0.12 + Math.sin(t * 0.4 + i) * 0.02, j = 1 + 0.04 * Math.sin(t * 0.7 + i * 1.3);
+        circ(c, cx + Math.cos(a) * rr * j, cy + Math.sin(a) * rr * j, R * (0.1 + r() * 0.05));
+      }
+      c.fillStyle = ring ? "rgba(226,160,150,.4)" : "rgba(240,188,172,.6)"; c.fill();
+    }
+    c.restore();
+  }
+  drawZona(c, cx, cy, R, 0, 0, 1);
+  const g = c.createRadialGradient(cx - R * .3, cy - R * .35, R * .1, cx, cy, R);
+  g.addColorStop(0, "#fbe4d8"); g.addColorStop(.7, "#e8b2a3"); g.addColorStop(1, "#c88274");
+  c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.fillStyle = g; c.fill();
+  const r2 = rng(3); c.fillStyle = "rgba(140,60,60,.16)"; c.beginPath();
+  for (let i = 0; i < 90; i++) { const a = r2() * TAU, rr = Math.sqrt(r2()) * R * .92; circ(c, cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, R * (.008 + r2() * .015)); }
+  c.fill();
+}
+
+function nucleus(c, x, y, r, col) {
+  c.beginPath(); circ(c, x, y, r); c.fillStyle = col || "rgba(255,240,235,.55)"; c.fill();
+  c.lineWidth = Math.max(1, r * 0.08); c.strokeStyle = "rgba(150,70,80,.35)"; c.stroke();
+  c.beginPath(); circ(c, x + r * .15, y - r * .1, r * .28); c.fillStyle = "rgba(170,80,95,.5)"; c.fill();
+}
+
+function drawSperm(c, x, y, ang, len, t, ph, alpha) {
+  const ux = Math.cos(ang), uy = Math.sin(ang), nx = -uy, ny = ux;
+  c.save(); c.globalAlpha = alpha;
+  c.beginPath(); c.moveTo(x, y);
+  for (let k = 1; k <= 22; k++) {
+    const s = k / 22, off = Math.sin(s * 9 - t * 12 + ph) * len * 0.08 * s;
+    c.lineTo(x - ux * len * s + nx * off, y - uy * len * s + ny * off);
+  }
+  c.strokeStyle = "rgba(240,230,236,.75)"; c.lineWidth = Math.max(1, len * 0.018); c.stroke();
+  c.translate(x, y); c.rotate(ang);
+  c.beginPath(); c.ellipse(len * 0.02, 0, len * 0.07, len * 0.045, 0, 0, TAU); c.fillStyle = "#f7eff3"; c.fill();
+  c.restore();
+}
+
+function cellLayout(n) {
+  if (n === 2) return [[-.48, 0, .5], [.48, .02, .5]];
+  if (n === 4) return [[-.44, -.34, .43], [.44, -.3, .43], [-.4, .36, .43], [.42, .38, .43]];
+  const out = [], rr = 0.98 / Math.sqrt(n) * 1.08;
+  for (let k = 0; k < n; k++) { const r = 0.82 * Math.sqrt((k + 0.5) / n), a = k * 2.39996; out.push([Math.cos(a) * r, Math.sin(a) * r, rr]); }
+  return out;
+}
+
+function drawCells(c, cx, cy, R, n, t) {
+  for (const [x, y, r] of cellLayout(n)) {
+    const px = cx + x * R, py = cy + y * R, pr = r * R * (1 + 0.015 * Math.sin(t * 1.3 + x * 5));
+    const g = c.createRadialGradient(px - pr * .35, py - pr * .4, pr * .1, px, py, pr);
+    g.addColorStop(0, "#fde6db"); g.addColorStop(.75, "#eab3a3"); g.addColorStop(1, "#c98475");
+    c.beginPath(); circ(c, px, py, pr); c.fillStyle = g; c.fill();
+    c.lineWidth = Math.max(1, R * .012); c.strokeStyle = "rgba(150,70,70,.35)"; c.stroke();
+    nucleus(c, px + pr * .1, py, pr * .26);
+  }
+}
+
+function drawBlastocyst(c, cx, cy, R, hatch, t) {
+  const B = R * (0.92 + 0.16 * hatch);
+  if (hatch < 1) drawZona(c, cx, cy, R * (1 + .05 * hatch), 0.5, hatch * 1.4, 1 - hatch * 0.7);
+  const g = c.createRadialGradient(cx, cy, B * .1, cx, cy, B);
+  g.addColorStop(0, "rgba(255,215,215,.12)"); g.addColorStop(1, "rgba(240,170,170,.38)");
+  c.beginPath(); circ(c, cx, cy, B); c.fillStyle = g; c.fill();
+  const n = 28;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * TAU, w = 1 + 0.03 * Math.sin(t + i);
+    c.save(); c.translate(cx + Math.cos(a) * B * .93 * w, cy + Math.sin(a) * B * .93 * w); c.rotate(a + Math.PI / 2);
+    c.beginPath(); c.ellipse(0, 0, B * .13, B * .065, 0, 0, TAU); c.fillStyle = "#e6a898"; c.fill();
+    c.lineWidth = 1; c.strokeStyle = "rgba(140,60,60,.35)"; c.stroke();
+    c.beginPath(); c.ellipse(0, 0, B * .04, B * .025, 0, 0, TAU); c.fillStyle = "rgba(255,240,235,.6)"; c.fill();
+    c.restore();
+  }
+  const ix = cx, iy = cy - B * .55;
+  for (let k = 0; k < 11; k++) {
+    const r = 0.3 * Math.sqrt((k + .5) / 11), a = k * 2.39996;
+    const px = ix + Math.cos(a) * r * B, py = iy + Math.sin(a) * r * B * .7, pr = B * .12;
+    c.beginPath(); circ(c, px, py, pr); c.fillStyle = "#f3c2b3"; c.fill();
+    c.lineWidth = 1; c.strokeStyle = "rgba(150,70,70,.4)"; c.stroke();
+    nucleus(c, px, py, pr * .3);
+  }
+}
+
+function sceneMicro(c, W, H, d, t) {
+  microBackdrop(c, W, H, t);
+  const S = Math.min(W, H), cx = W / 2, cy = H * .53, R = S * .2;
+  if (d < 14) {
+    drawOvum(c, cx, cy, R, t, 0.55 + 0.45 * smooth(1, 13, d));
+    if (d < 12) nucleus(c, cx + R * .22, cy - R * .12, R * .2);
+    else { c.beginPath(); circ(c, cx + Math.cos(-.8) * R * .98, cy + Math.sin(-.8) * R * .98, R * .11); c.fillStyle = "#f1c6b8"; c.fill(); }
+  } else if (d < 15) {
+    const p = d - 14;
+    drawOvum(c, cx, cy, R, t, 0.5 * (1 - p));
+    c.beginPath(); circ(c, cx + Math.cos(-.8) * R * .98, cy + Math.sin(-.8) * R * .98, R * .11); c.fillStyle = "#f1c6b8"; c.fill();
+    for (let i = 0; i < 11; i++) {
+      const a = i / 11 * TAU + .3, dist = R * (1.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * .6 + i * 1.7)));
+      drawSperm(c, cx + Math.cos(a) * dist, cy + Math.sin(a) * dist, a + Math.PI, R * 1.1, t, i, 1 - smooth(.5, 1, p));
+    }
+    const q = smooth(.35, 1, p);
+    if (p > .3) { nucleus(c, cx - R * .32 * (1 - q * .7), cy + R * .05, R * .13, "rgba(255,236,230,.7)"); nucleus(c, cx + R * .3 * (1 - q * .7), cy - R * .04, R * .14, "rgba(255,236,230,.7)"); }
+  } else if (d < 19) {
+    drawZona(c, cx, cy, R, 0, 0, 1);
+    const n = d < 16 ? 2 : d < 16.8 ? 4 : d < 17.6 ? 8 : d < 18.4 ? 16 : 32;
+    drawCells(c, cx, cy, R * .98, n, t);
+  } else {
+    drawBlastocyst(c, cx, cy, R, smooth(20, 21.5, d), t);
+  }
+  return 0.1 / (2 * R);
+}
+
+// ---------- 着床：囊胚钻进子宫内膜，长成孕囊 ----------
+function sceneImplant(c, W, H, d, t) {
+  const S = Math.min(W, H), cx = W / 2, cy = H * .53;
+  const B = S * lerp(.17, .4, smooth(22, 32, d));
+  const e = smooth(19.5, 24.5, d);
+  const surf = cy - B * lerp(-1.25, 1.15, e);
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#1d0a12"); g.addColorStop(1, "#2c0f1a");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  specks(c, W, H, t, 30, "rgba(255,200,215,.07)", 5);
+
+  // 子宫内膜
+  const tg = c.createLinearGradient(0, surf, 0, surf + S * .5);
+  tg.addColorStop(0, "#9a3348"); tg.addColorStop(1, "#5d1427");
+  c.beginPath(); c.moveTo(0, H + 2);
+  for (let x = 0; x <= W; x += 8) c.lineTo(x, surf + Math.sin(x * .03 + 1) * 6 + Math.sin(x * .011) * 9);
+  c.lineTo(W, H + 2); c.closePath(); c.fillStyle = tg; c.fill();
+  const r = rng(21);
+  c.fillStyle = "rgba(60,8,22,.45)"; c.beginPath();
+  for (let i = 0; i < 26; i++) { const x = r() * W, y = surf + 20 + r() * (H - surf); c.moveTo(x + 9, y); c.ellipse(x, y, 4 + r() * 6, 12 + r() * 16, r() - .5, 0, TAU); }
+  c.fill();
+  c.strokeStyle = "rgba(220,60,80,.35)"; c.lineWidth = 1.4;
+  for (let i = 0; i < 14; i++) {
+    let x = r() * W, y = surf + 10 + r() * (H - surf); c.beginPath(); c.moveTo(x, y);
+    for (let k = 0; k < 6; k++) { x += (r() - .5) * 40; y += 12 + r() * 10; c.lineTo(x, y); }
+    c.stroke();
+  }
+
+  // 孕囊：囊胚逐渐变成有羊膜腔、卵黄囊和胚盘的结构
+  const m = smooth(23, 26.5, d);
+  c.save(); c.globalAlpha = 1 - m; drawBlastocyst(c, cx, cy, B / 1.05, 1, t); c.restore();
+  if (m > 0) {
+    c.save(); c.globalAlpha = m;
+    const vr = rng(9); c.strokeStyle = "rgba(240,170,170,.6)"; c.lineWidth = Math.max(1, B * .02); c.lineCap = "round"; c.beginPath();
+    for (let i = 0; i < 70; i++) { const a = i / 70 * TAU, l = B * (.06 + vr() * .07); c.moveTo(cx + Math.cos(a) * B, cy + Math.sin(a) * B); c.lineTo(cx + Math.cos(a + .05) * (B + l), cy + Math.sin(a + .05) * (B + l)); }
+    c.stroke();
+    const cg = c.createRadialGradient(cx, cy, B * .2, cx, cy, B);
+    cg.addColorStop(0, "rgba(120,40,60,.9)"); cg.addColorStop(1, "rgba(200,110,120,.95)");
+    c.beginPath(); circ(c, cx, cy, B); c.fillStyle = cg; c.fill();
+    c.lineWidth = B * .03; c.strokeStyle = "rgba(245,190,190,.7)"; c.stroke();
+    c.beginPath(); circ(c, cx - B * .05, cy - B * .16, B * .26); c.fillStyle = "rgba(255,225,230,.22)"; c.fill(); c.lineWidth = 1.5; c.strokeStyle = "rgba(255,230,235,.6)"; c.stroke();
+    const yg = c.createRadialGradient(cx, cy + B * .22, B * .03, cx + B * .03, cy + B * .3, B * .24);
+    yg.addColorStop(0, "#f8e3a6"); yg.addColorStop(1, "#d79a5d");
+    c.beginPath(); circ(c, cx + B * .03, cy + B * .3, B * .23); c.fillStyle = yg; c.fill();
+    c.beginPath(); c.ellipse(cx - B * .01, cy + B * .07, B * .27, B * .05, -.05, 0, TAU); c.fillStyle = "#f2b7b0"; c.fill();
+    c.strokeStyle = "rgba(140,50,60,.45)"; c.lineWidth = 1; c.stroke();
+    c.lineWidth = B * .07; c.strokeStyle = "rgba(220,140,140,.8)"; c.beginPath(); c.moveTo(cx - B * .2, cy + B * .1); c.quadraticCurveTo(cx - B * .5, cy + B * .3, cx - B * .78, cy + B * .55); c.stroke();
+    c.restore();
+  }
+  // 包在孕囊上的一层内膜
+  c.save(); c.globalAlpha = e * .85;
+  c.beginPath(); c.arc(cx, cy, B * 1.08, -Math.PI * .92, -Math.PI * .08); c.lineWidth = B * .12; c.strokeStyle = "#8f2c42"; c.lineCap = "round"; c.stroke();
+  c.restore();
+  const mm = 0.2 * Math.pow(25, smooth(21, 33, d));
+  return mm / (2 * B);
+}
+
+// ---------- 子宫环境（胚胎期、胎儿期共用） ----------
+function wombBackdrop(c, W, H, cx, cy, R, t, early) {
+  const g = c.createRadialGradient(cx, cy, R * .9, cx, cy, Math.max(W, H) * .8);
+  g.addColorStop(0, "#5e1b2c"); g.addColorStop(.35, "#3a0f1c"); g.addColorStop(1, "#12060b");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  c.save(); c.strokeStyle = "rgba(255,170,185,.06)"; c.lineWidth = 1.2;
+  for (let i = 0; i < 9; i++) { c.beginPath(); c.ellipse(cx, cy, R * (1.05 + i * .035), R * (1.03 + i * .033), .2, 0, TAU); c.stroke(); }
+  c.restore();
+  const f = c.createRadialGradient(cx - R * .25, cy - R * .3, R * .05, cx, cy, R);
+  f.addColorStop(0, early ? "#bd6070" : "#b9525f"); f.addColorStop(.55, "#80293d"); f.addColorStop(1, "#4d1324");
+  c.beginPath(); circ(c, cx, cy, R); c.fillStyle = f; c.fill();
+  c.lineWidth = Math.max(1, R * .012); c.strokeStyle = "rgba(255,210,218,.25)"; c.stroke();
+  specks(c, W, H, t, 40, "rgba(255,225,230,.14)", 13, cx, cy, R);
+}
+
+function drawPlacenta(c, cx, cy, R, a0, a1, th, t) {
+  c.save();
+  const pg = c.createRadialGradient(cx, cy, R - th, cx, cy, R);
+  pg.addColorStop(0, "#a12a40"); pg.addColorStop(1, "#5c1022");
+  c.beginPath(); c.arc(cx, cy, R * 1.004, a0, a1); c.arc(cx, cy, R - th, a1, a0, true); c.closePath();
+  c.fillStyle = pg; c.fill();
+  c.beginPath();
+  const n = Math.max(6, Math.round((a1 - a0) * 9));
+  for (let i = 0; i <= n; i++) { const a = lerp(a0 + .05, a1 - .05, i / n); circ(c, cx + Math.cos(a) * (R - th), cy + Math.sin(a) * (R - th), th * .32); }
+  c.fillStyle = "#94253b"; c.fill();
+  const am = (a0 + a1) / 2, ix = cx + Math.cos(am) * (R - th * 1.05), iy = cy + Math.sin(am) * (R - th * 1.05);
+  c.strokeStyle = "rgba(70,20,60,.55)"; c.lineWidth = Math.max(1, th * .07); c.lineCap = "round";
+  for (let k = -3; k <= 3; k++) {
+    if (!k) continue;
+    const a = am + k * (a1 - a0) / 8, rr = R - th * (.55 + .2 * Math.abs(Math.sin(k)));
+    c.beginPath(); c.moveTo(ix, iy); c.quadraticCurveTo(cx + Math.cos(am + k * .06) * (R - th * .8), cy + Math.sin(am + k * .06) * (R - th * .8), cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); c.stroke();
+  }
+  c.restore();
+  return { x: ix, y: iy, a: am };
+}
+
+function drawCord(c, x0, y0, x1, y1, w, t, bend) {
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, dx = x1 - x0, dy = y1 - y0;
+  const c1x = mx - dy * bend + Math.sin(t * .5) * w, c1y = my + dx * bend;
+  c.save(); c.lineCap = "round";
+  c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(c1x, c1y, x1, y1);
+  c.lineWidth = w; c.strokeStyle = "#c79aa8"; c.stroke();
+  c.setLineDash([w * .9, w * .7]); c.lineDashOffset = -t * 2;
+  c.lineWidth = w * .45; c.strokeStyle = "rgba(120,50,90,.55)"; c.stroke();
+  c.setLineDash([]); c.lineWidth = w * .18; c.strokeStyle = "rgba(255,235,240,.35)"; c.stroke();
+  c.restore();
+}
+
+// 离屏图层，用来给身体上光影（source-atop 只染已画的部分）
+const layerCv = document.createElement("canvas");
+const layer = layerCv.getContext("2d");
+function prepLayer(W, H, dpr) {
+  if (layerCv.width !== Math.round(W * dpr) || layerCv.height !== Math.round(H * dpr)) { layerCv.width = Math.round(W * dpr); layerCv.height = Math.round(H * dpr); }
+  layer.setTransform(1, 0, 0, 1, 0, 0); layer.clearRect(0, 0, layerCv.width, layerCv.height);
+  layer.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return layer;
+}
+function flushLayer(c, alpha) {
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = alpha; c.drawImage(layerCv, 0, 0); c.restore();
+}
+function tubeFill(c, pts) { c.beginPath(); for (const [x, y, r] of pts) circ(c, x, y, r); c.fill(); }
+
+// ---------- 胚胎期：C 形身体、尾巴、肢芽、跳动的心脏 ----------
+function sceneEmbryo(c, W, H, d, t) {
+  const S = Math.min(W, H), R = S * .44, cx = W / 2, cy = H * .52;
+  const e = smooth(29, 56, d);
+  wombBackdrop(c, W, H, cx, cy, R, t, 1);
+  const pl = drawPlacenta(c, cx, cy, R, 1.9, 3.2, R * lerp(.05, .09, e), t);
+  const E = R * lerp(.82, 1.02, e);
+  const ex = cx - R * .08, ey = cy + R * .05;
+  const sway = Math.sin(t * .4) * .04;
+  const a0 = lerp(-2.15, -1.75, e) + sway, a1 = lerp(2.55, 1.95, e) + sway, rad = E * lerp(.34, .4, e);
+  const end = lerp(1, .86, smooth(44, 56, d)), hb = lerp(.16, .27, e);
+  const P = s => { const th = lerp(a0, a1, s), rr = rad * (1 - .45 * smooth(.7, 1, s) * (1 - .6 * e)); return [ex + Math.cos(th) * rr, ey + Math.sin(th) * rr, th]; };
+  const Wd = s => E * ((.1 + (hb - .1) * Math.exp(-(((s - .07) / .12) ** 2)) + .03 * Math.exp(-(((s - .42) / .15) ** 2))) * (1 - .88 * smooth(.72, 1, s / end * .98 + .02)));
+
+  // 卵黄囊与体蒂
+  const ys = { x: cx + R * .42, y: cy + R * .64, r: R * lerp(.11, .07, e) };
+  const nav = P(.5);
+  drawCord(c, pl.x, pl.y, nav[0] - Math.cos(nav[2]) * Wd(.5) * .6, nav[1] - Math.sin(nav[2]) * Wd(.5) * .6, E * lerp(.05, .07, e), t, .25);
+  c.strokeStyle = "rgba(230,180,120,.6)"; c.lineWidth = Math.max(1, E * .015);
+  c.beginPath(); c.moveTo(ys.x, ys.y); c.quadraticCurveTo(cx + R * .3, cy + R * .3, nav[0] - Math.cos(nav[2]) * Wd(.5), nav[1] - Math.sin(nav[2]) * Wd(.5)); c.stroke();
+  const yg = c.createRadialGradient(ys.x - ys.r * .3, ys.y - ys.r * .3, ys.r * .1, ys.x, ys.y, ys.r);
+  yg.addColorStop(0, "#fbe7b0"); yg.addColorStop(1, "#cf8d52");
+  c.beginPath(); circ(c, ys.x, ys.y, ys.r); c.fillStyle = yg; c.fill();
+  // 羊膜
+  c.beginPath(); circ(c, ex, ey, E * .66); c.fillStyle = "rgba(255,220,230,.06)"; c.fill();
+  c.lineWidth = 1.5; c.strokeStyle = "rgba(255,230,238,.35)"; c.stroke();
+
+  // 身体（离屏图层）
+  const L = prepLayer(W, H, DPR);
+  const body = [];
+  for (let s = 0; s <= end; s += .012) { const p = P(s); body.push([p[0], p[1], Wd(s)]); }
+  L.fillStyle = "#f0bcb8"; tubeFill(L, body);
+  const limb = (s0, len, ang, wid) => {
+    if (len <= 0) return;
+    const p = P(s0), nx = -Math.cos(p[2]), ny = -Math.sin(p[2]), tx = -Math.sin(p[2]), ty = Math.cos(p[2]);
+    const dx = nx * Math.cos(ang) + tx * Math.sin(ang), dy = ny * Math.cos(ang) + ty * Math.sin(ang);
+    const bx = p[0] + nx * Wd(s0) * .5, by = p[1] + ny * Wd(s0) * .5, pts = [];
+    for (let k = 0; k <= 12; k++) { const q = k / 12; pts.push([bx + dx * len * q, by + dy * len * q, wid * (1 - .25 * q)]); }
+    L.fillStyle = "#eeb3ae"; tubeFill(L, pts);
+    const fx = bx + dx * len, fy = by + dy * len, paddle = smooth(44, 52, d);
+    L.beginPath(); L.ellipse(fx, fy, wid * (1 + .5 * paddle), wid * (.8 + .2 * paddle), Math.atan2(dy, dx) + Math.PI / 2, 0, TAU); L.fill();
+    if (d > 49) { L.beginPath(); for (let k = -1.5; k <= 1.5; k++) { const a = Math.atan2(dy, dx) + k * .38; circ(L, fx + Math.cos(a) * wid * 1.35, fy + Math.sin(a) * wid * 1.35, wid * .32 * smooth(49, 56, d)); } L.fill(); }
+  };
+  limb(.37, E * .3 * smooth(37, 56, d), .55 + sway, E * .045);
+  limb(.68, E * .26 * smooth(41, 58, d), .35, E * .05);
+  // 光影
+  L.save(); L.globalCompositeOperation = "source-atop";
+  const lg = L.createLinearGradient(ex - E * .5, ey - E * .5, ex + E * .5, ey + E * .5);
+  lg.addColorStop(0, "rgba(255,245,240,.45)"); lg.addColorStop(.55, "rgba(255,200,200,0)"); lg.addColorStop(1, "rgba(110,20,40,.45)");
+  L.fillStyle = lg; L.fillRect(0, 0, W, H);
+  L.restore();
+  // 体节、鳃弓、眼点、心脏
+  const so = 1 - smooth(40, 48, d);
+  if (so > 0) {
+    L.fillStyle = `rgba(255,236,236,${.45 * so})`; L.beginPath();
+    for (let s = .22; s < .82 * end; s += .034) { const p = P(s); circ(L, p[0] + Math.cos(p[2]) * Wd(s) * .72, p[1] + Math.sin(p[2]) * Wd(s) * .72, E * .017); }
+    L.fill();
+  }
+  const ar = 1 - smooth(44, 52, d);
+  if (ar > 0 && d > 30) {
+    L.strokeStyle = `rgba(150,50,70,${.5 * ar})`; L.lineWidth = Math.max(1, E * .012);
+    for (const s of [.17, .205, .24]) { const p = P(s), w = Wd(s); L.beginPath(); L.arc(p[0], p[1], w * .85, p[2] + Math.PI - .35, p[2] + Math.PI + .35); L.stroke(); }
+  }
+  const hp = P(.3), hw = Wd(.3), bpm = heartRate(d), beat = bpm ? pulse(t, bpm) : 0;
+  const hx = hp[0] - Math.cos(hp[2]) * hw * .8, hy = hp[1] - Math.sin(hp[2]) * hw * .8, hr = E * .075 * (1 + .14 * beat);
+  const hg = L.createRadialGradient(hx, hy, 0, hx, hy, hr * 1.6);
+  hg.addColorStop(0, `rgba(255,70,90,${.65 + .3 * beat})`); hg.addColorStop(.6, "rgba(220,40,70,.45)"); hg.addColorStop(1, "rgba(220,40,70,0)");
+  L.beginPath(); circ(L, hx, hy, hr * 1.6); L.fillStyle = hg; L.fill();
+  const eo = smooth(39, 47, d);
+  if (eo > 0) {
+    const p = P(.06), w = Wd(.06);
+    L.beginPath(); circ(L, p[0] - Math.cos(p[2] + .5) * w * .35, p[1] - Math.sin(p[2] + .5) * w * .35, E * .036); L.fillStyle = `rgba(40,15,25,${.8 * eo})`; L.fill();
+  }
+  flushLayer(c, .95);
+  return (seriesAt(CRL, d, true) * 10) / E;
+}
+
+// ---------- 胎儿期：蜷缩的胎儿，随周数变大、长肉、转为头朝下 ----------
+function bez(p, s) {
+  const u = 1 - s, a = u * u * u, b = 3 * u * u * s, k = 3 * u * s * s, e = s * s * s;
+  return [a * p[0][0] + b * p[1][0] + k * p[2][0] + e * p[3][0], a * p[0][1] + b * p[1][1] + k * p[2][1] + e * p[3][1]];
+}
+function seg(c, a, b, r0, r1) {
+  c.beginPath();
+  for (let k = 0; k <= 12; k++) { const q = k / 12; circ(c, lerp(a[0], b[0], q), lerp(a[1], b[1], q), lerp(r0, r1, q)); }
+  c.fill();
+}
+function blob(c, p, rx, ry, rot) { c.beginPath(); c.ellipse(p[0], p[1], rx, ry, rot, 0, TAU); c.fill(); }
+const rot2 = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+
+function sceneFetus(c, W, H, d, t) {
+  const S = Math.min(W, H), R = S * .44, cx = W / 2, cy = H * .52;
+  const u = clamp((d - 56) / 224, 0, 1);
+  wombBackdrop(c, W, H, cx, cy, R, t, 0);
+  const pl = drawPlacenta(c, cx, cy, R, 1.85, 3.25, R * lerp(.09, .16, u), t);
+
+  const Lp = R * (.8 + .6 * u);
+  const act = d < 70 ? .45 : d < 210 ? 1 : lerp(1, .4, smooth(210, 280, d));
+  const turn = smooth(196, 245, d);
+  const ang = lerp(-.25, Math.PI - .12, turn) + Math.sin(t * .22) * .16 * act * (1 - .7 * turn);
+  const hr = lerp(.29, .2, Math.pow(u, .7));
+  const plump = lerp(.6, .95, smooth(.12, 1, u)), lp = lerp(.7, 1.05, smooth(.12, 1, u));
+  const legLen = lerp(.78, 1, u), armLen = lerp(.85, 1, u);
+  const kick = Math.pow(Math.max(0, Math.sin(t * 1.3)), 8) * act;
+  const kick2 = Math.pow(Math.max(0, Math.sin(t * .9 + 2)), 10) * act;
+  const nod = Math.sin(t * .5) * .05 * act, br = 1 + Math.sin(t * 2.2) * .012 * act;
+  const sp = [[.02, -.2], [.3, -.15], [.31, .28], [.04, .37]];
+  const rb = s => plump * (.065 + .11 * Math.sin(Math.PI * (.12 + .78 * s))) * br;
+  const ccx = lerp(.04, .09, u), ccy = lerp(-.15, -.035, u);
+  const toW = (x, y) => { const v = rot2([(x - ccx) * Lp, (y - ccy) * Lp], ang); return [cx + v[0], cy + v[1]]; };
+
+  // 关键点（局部坐标，脸朝左，头朝上）
+  const N = bez(sp, 0), ho = rot2([-.07, -hr * .92], nod), Hc = [N[0] + ho[0], N[1] + ho[1]];
+  const f = (dx, dy) => { const o = rot2([dx * hr, dy * hr], nod); return [Hc[0] + o[0], Hc[1] + o[1]]; };
+  const sh = bez(sp, .13), Sh = [sh[0] - .05, sh[1] + .03], El = [Sh[0] - .04 * armLen, Sh[1] + .14 * armLen];
+  const wig = Math.sin(t * .9) * .015 * act, hm = f(-.55, 1.1), Hd = [hm[0] + wig, hm[1] - wig];
+  const Sh2 = [Sh[0] + .05, Sh[1] - .01], El2 = [Sh2[0] - .08, Sh2[1] + .2 * armLen], Hd2 = [El2[0] - .14 * armLen, El2[1] - .08];
+  const hp = bez(sp, .86), Hp = [hp[0] - .06, hp[1]];
+  const K = [Hp[0] - .25 * legLen - .05 * kick, Hp[1] - .17 * legLen + .08 * kick];
+  const F = [K[0] + .1 * legLen - .1 * kick, K[1] + .25 * legLen + .08 * kick];
+  const Hp2 = [Hp[0] + .04, Hp[1] - .03];
+  const K2 = [Hp2[0] - .23 * legLen - .04 * kick2, Hp2[1] - .22 * legLen + .06 * kick2];
+  const F2 = [K2[0] + .13 * legLen - .08 * kick2, K2[1] + .24 * legLen + .05 * kick2];
+
+  // 脐带在胎儿身后
+  const nv = bez(sp, .62), navel = toW(nv[0] - rb(.62) * .9, nv[1]);
+  drawCord(c, pl.x, pl.y, navel[0], navel[1], R * lerp(.03, .045, u), t, .35);
+
+  const skinA = [234, 146, 150], skinB = [242, 176, 164], skinC = [246, 202, 182];
+  const skin = u < .45 ? mix(skinA, skinB, u / .45) : mix(skinB, skinC, (u - .45) / .55);
+  const far = mix(skin, [196, 104, 118], .3);
+
+  const L = prepLayer(W, H, DPR);
+  const local = () => { L.translate(cx, cy); L.rotate(ang); L.scale(Lp, Lp); L.translate(-ccx, -ccy); };
+  L.save(); local();
+  // 远侧手脚
+  L.fillStyle = rgb(far);
+  seg(L, Sh2, El2, .04 * lp, .035 * lp); seg(L, El2, Hd2, .035 * lp, .03 * lp); blob(L, Hd2, .04 * lp, .032 * lp, 0);
+  seg(L, Hp2, K2, .068 * lp, .055 * lp); seg(L, K2, F2, .05 * lp, .036 * lp);
+  blob(L, F2, .07 * legLen, .03 * lp, Math.atan2(F2[1] - K2[1], F2[0] - K2[0]) + Math.PI / 2);
+  // 身体、头
+  L.fillStyle = rgb(skin);
+  L.beginPath();
+  for (let s = 0; s <= 1.001; s += .02) { const p = bez(sp, s); circ(L, p[0], p[1], rb(s)); }
+  const rp = bez(sp, .95); circ(L, rp[0] + .015, rp[1] - .01, rb(.95) * 1.08);
+  circ(L, Hc[0], Hc[1], hr);
+  L.fill();
+  blob(L, f(-.42, .5), .54 * hr, .46 * hr, .3);
+  L.beginPath(); circ(L, ...f(-.93, .3), .13 * hr); L.fill();
+  // 近侧手脚（带一点阴影区分层次）
+  L.shadowColor = "rgba(80,15,30,.22)"; L.shadowBlur = Lp * .015 * DPR;
+  seg(L, Hp, K, .075 * lp, .06 * lp); seg(L, K, F, .056 * lp, .04 * lp);
+  blob(L, F, .075 * legLen, .032 * lp, Math.atan2(F[1] - K[1], F[0] - K[0]) + Math.PI / 2);
+  seg(L, Sh, El, .046 * lp, .038 * lp); seg(L, El, Hd, .038 * lp, .032 * lp); blob(L, Hd, .046 * lp, .036 * lp, .6);
+  L.shadowBlur = 0; L.shadowColor = "transparent";
+  L.restore();
+
+  // 光影：世界坐标，光从左上方来
+  L.save(); L.globalCompositeOperation = "source-atop";
+  const lg = L.createLinearGradient(cx - R * .7, cy - R * .8, cx + R * .7, cy + R * .7);
+  lg.addColorStop(0, "rgba(255,246,240,.45)"); lg.addColorStop(.5, "rgba(255,220,210,0)"); lg.addColorStop(1, "rgba(100,18,40,.42)");
+  L.fillStyle = lg; L.fillRect(0, 0, W, H);
+  L.restore();
+
+  // 细节
+  L.save(); local(); L.lineCap = "round";
+  const sd = .4 * (1 - smooth(90, 150, d));
+  if (sd > 0) {
+    L.fillStyle = `rgba(255,240,240,${sd})`; L.beginPath();
+    for (let s = .04; s < .98; s += .055) {
+      const a = bez(sp, Math.max(0, s - .01)), b = bez(sp, s + .01), p = bez(sp, s);
+      const tx = b[0] - a[0], ty = b[1] - a[1], m = Math.hypot(tx, ty) || 1;
+      circ(L, p[0] + ty / m * rb(s) * .55, p[1] - tx / m * rb(s) * .55, .013);
+    }
+    L.fill();
+  }
+  const hg = 1 - smooth(100, 170, d), bpm = heartRate(d);
+  if (hg > 0) {
+    const p = bez(sp, .3), b = pulse(t, bpm), x = p[0] - rb(.3) * .35;
+    const g = L.createRadialGradient(x, p[1], 0, x, p[1], .07);
+    g.addColorStop(0, `rgba(255,60,85,${(.45 + .35 * b) * hg})`); g.addColorStop(1, "rgba(255,60,85,0)");
+    L.fillStyle = g; L.beginPath(); circ(L, x, p[1], .07); L.fill();
+  }
+  const dark = "rgba(85,30,40,.7)";
+  const eye = f(-.5, .06), blink = (t % 7) < .18;
+  if (d < 84) { L.fillStyle = `rgba(45,15,25,${.85 * (1 - smooth(74, 84, d))})`; L.beginPath(); circ(L, ...eye, .14 * hr); L.fill(); }
+  if (d >= 74 && (d < 182 || blink)) {
+    L.strokeStyle = dark; L.lineWidth = hr * .045;
+    L.beginPath(); L.arc(eye[0], eye[1] - .03 * hr, .13 * hr, .2 * Math.PI + nod, .85 * Math.PI + nod); L.stroke();
+  } else if (d >= 182) {
+    L.fillStyle = "rgba(40,22,30,.92)"; blob(L, eye, .12 * hr, .09 * hr, nod);
+    L.fillStyle = "rgba(255,255,255,.75)"; L.beginPath(); circ(L, eye[0] - .04 * hr, eye[1] - .03 * hr, .028 * hr); L.fill();
+  }
+  if (d > 150) {
+    const bw = f(-.52, -.12); L.strokeStyle = `rgba(110,60,50,${.35 * smooth(150, 220, d)})`; L.lineWidth = hr * .035;
+    L.beginPath(); L.arc(bw[0], bw[1] + .12 * hr, .17 * hr, 1.15 * Math.PI + nod, 1.75 * Math.PI + nod); L.stroke();
+  }
+  const ear = f(.16, lerp(.5, .14, smooth(56, 126, d)));
+  L.strokeStyle = `rgba(150,70,75,.6)`; L.lineWidth = hr * .07;
+  L.beginPath(); L.arc(ear[0], ear[1], .19 * hr, -1.35 + nod, 1.7 + nod); L.stroke();
+  L.lineWidth = hr * .035; L.beginPath(); L.arc(ear[0] - .02 * hr, ear[1] + .01 * hr, .09 * hr, -1 + nod, 1.4 + nod); L.stroke();
+  L.fillStyle = dark; L.beginPath(); circ(L, ...f(-.92, .36), .025 * hr); L.fill();
+  const mo = f(-.78, .6); L.strokeStyle = dark; L.lineWidth = hr * .035;
+  L.beginPath(); L.moveTo(mo[0] - .06 * hr, mo[1]); L.quadraticCurveTo(mo[0], mo[1] + .03 * hr, mo[0] + .07 * hr, mo[1] - .01 * hr); L.stroke();
+  const nh = Math.floor(34 * smooth(140, 265, d));
+  if (nh) {
+    const hrng = rng(17); L.strokeStyle = `rgba(80,45,35,${lerp(.35, .6, smooth(180, 265, d))})`; L.lineWidth = hr * .025;
+    L.beginPath();
+    for (let i = 0; i < nh; i++) {
+      const a = lerp(-2.7, -.15, hrng()) + nod, l = hr * (.05 + hrng() * .07);
+      const x0 = Hc[0] + Math.cos(a) * hr * .96, y0 = Hc[1] + Math.sin(a) * hr * .96;
+      L.moveTo(x0, y0); L.quadraticCurveTo(x0 + Math.cos(a + .5) * l, y0 + Math.sin(a + .5) * l, x0 + Math.cos(a + .25) * l * 1.6, y0 + Math.sin(a + .25) * l * 1.6);
+    }
+    L.stroke();
+  }
+  L.restore();
+  flushLayer(c, lerp(.88, 1, u));
+
+  return seriesAt(CRL, d, true) * 10 / (Lp * lerp(1.19, 1.01, u));
+}
+
+// ---------- 画面合成：相邻阶段之间交叉淡化 ----------
+const womb = document.getElementById("womb"), wctx = womb.getContext("2d");
+const offCv = document.createElement("canvas"), offCtx = offCv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function sizeWomb() {
+  const r = womb.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2); W = r.width; H = r.height;
+  for (const cv of [womb, offCv]) { cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); }
+}
+function sceneAt(d) {
+  if (d < 19.5) return [sceneMicro];
+  if (d < 22) return [sceneMicro, sceneImplant, smooth(19.5, 22, d)];
+  if (d < 29) return [sceneImplant];
+  if (d < 33) return [sceneImplant, sceneEmbryo, smooth(29, 33, d)];
+  if (d < 55) return [sceneEmbryo];
+  if (d < 59) return [sceneEmbryo, sceneFetus, smooth(55, 59, d)];
+  return [sceneFetus];
+}
+function renderWomb(d, t) {
+  if (!W || !H) return;
+  const [A, B, m] = sceneAt(d);
+  wctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  let mm = A(wctx, W, H, d, t);
+  if (B) {
+    offCtx.setTransform(1, 0, 0, 1, 0, 0); offCtx.clearRect(0, 0, offCv.width, offCv.height);
+    offCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const mm2 = B(offCtx, W, H, d, t);
+    wctx.save(); wctx.setTransform(1, 0, 0, 1, 0, 0); wctx.globalAlpha = m; wctx.drawImage(offCv, 0, 0); wctx.restore();
+    if (m > .5) mm = mm2;
+  }
+  wctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  scaleBar(wctx, mm, W, H);
+}
+
+// ---------- 妈妈侧影：肚子和子宫随孕周变大 ----------
+const momCv = document.getElementById("momCv"), mctx = momCv.getContext("2d");
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function fundusHeight(d) {
+  if (d < 84) return lerp(22, 32, smooth(28, 84, d));
+  if (d < 140) return lerp(32, 68, smooth(84, 140, d));
+  if (d < 252) return lerp(68, 118, (d - 140) / 112);
+  return lerp(118, 110, smooth(252, 280, d));
+}
+function drawMom(d) {
+  const c = mctx, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (momCv.width !== 300 * dpr) { momCv.width = 300 * dpr; momCv.height = 400 * dpr; }
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, 300, 400);
+  const ink = cssVar("--muted"), fill = cssVar("--surface"), acc = cssVar("--accent");
+  const B = smooth(84, 266, d) * (1 - .06 * smooth(259, 280, d));
+  c.lineJoin = "round"; c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(138, 74);
+  c.bezierCurveTo(130, 86, 116, 98, 118, 120);
+  c.bezierCurveTo(120, 150, 128 + 8 * B, 180, 122 + 6 * B, 210);
+  c.bezierCurveTo(108, 225, 104, 250, 116, 275);
+  c.bezierCurveTo(126, 300, 122, 350, 124, 396);
+  c.lineTo(176, 396);
+  c.bezierCurveTo(180, 360, 184, 320, 180, 290);
+  c.bezierCurveTo(180 + 72 * B, 286 - 8 * B, 184 + 82 * B, 186, 172, 168);
+  c.bezierCurveTo(188 + 6 * B, 160, 194 + 6 * B, 120, 168, 112);
+  c.bezierCurveTo(160, 104, 158, 96, 160, 82);
+  c.closePath();
+  c.fillStyle = fill; c.fill(); c.strokeStyle = ink; c.stroke();
+  c.beginPath(); circ(c, 152, 48, 26); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(140, 106); c.bezierCurveTo(138, 150, 142, 180, 150, 214); c.globalAlpha = .45; c.stroke(); c.globalAlpha = 1;
+
+  // 子宫与胎儿
+  const fh = fundusHeight(d), ux = 168 + 28 * B, uy = 282 - fh / 2, rx = lerp(15, 58, B) + (d < 84 ? smooth(28, 84, d) * 4 : 4), ry = fh / 2;
+  c.beginPath(); c.ellipse(ux, uy, rx, ry, -.08 * B, 0, TAU);
+  c.globalAlpha = .22; c.fillStyle = acc; c.fill(); c.globalAlpha = 1;
+  c.strokeStyle = acc; c.lineWidth = 1.5; c.stroke();
+  if (d >= 28) {
+    const sc = d < 56 ? .25 + .25 * smooth(28, 56, d) : lerp(.45, .95, smooth(56, 280, d));
+    const up = smooth(196, 245, d) > .5 ? 1 : -1, hrad = ry * .32 * sc + 1.5;
+    c.fillStyle = acc; c.globalAlpha = .75;
+    c.beginPath(); c.ellipse(ux + 2, uy + up * ry * .12 * sc, rx * .42 * sc + 1.5, ry * .42 * sc + 1.5, 0, 0, TAU); c.fill();
+    if (d >= 50) { c.beginPath(); circ(c, ux - 2, uy - up * ry * .42 * sc, hrad); c.fill(); }
+    c.globalAlpha = 1;
+  }
+  // 宫底刻度
+  c.setLineDash([3, 3]); c.strokeStyle = ink; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(ux - 4, 282 - fh); c.lineTo(286, 282 - fh); c.stroke(); c.setLineDash([]);
+  c.fillStyle = ink; c.font = '13px "Noto Sans SC", sans-serif'; c.textAlign = "right";
+  c.fillText("宫底", 292, 282 - fh - 5);
+  c.beginPath(); c.moveTo(250, 215); c.lineTo(286, 215); c.globalAlpha = .4; c.stroke(); c.globalAlpha = 1;
+  c.fillText("肚脐", 292, 230);
+}
+
+// ---------- 界面 ----------
+const $ = id => document.getElementById(id);
+const slider = $("day");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let day = 1, shownDay = 0, playing = false, speed = 8, lastTs = 0, clock = 0;
+
+const weekOf = d => Math.min(40, Math.floor(d / 7) + 1);
+const gaText = d => `孕 ${Math.floor(d / 7)} 周 + ${d % 7} 天`;
+function fmtLen(cm) {
+  if (cm < 0.1) return (cm * 10).toFixed(2) + " mm";
+  if (cm < 1) return (cm * 10).toFixed(1) + " mm";
+  return cm.toFixed(1) + " cm";
+}
+function fmtWt(g) {
+  if (g < 1) return "< 1 g";
+  if (g < 1000) return (g < 20 ? g.toFixed(1) : Math.round(g)) + " g";
+  return (g / 1000).toFixed(2) + " kg";
+}
+
+// 器官卡片
+const organEls = ORGANS.map(o => {
+  const el = document.createElement("div");
+  el.className = "organ"; el.tabIndex = 0;
+  el.innerHTML = `<div class="organ-top"><span class="organ-name">${o.n}</span><span class="organ-state"></span></div><div class="bar"><i></i></div><div class="organ-note"></div>`;
+  $("organs").appendChild(el);
+  return el;
+});
+
+// 时间轴刻度和节点按钮
+const msBtns = MILESTONES.map(m => {
+  const tick = document.createElement("i");
+  tick.style.left = `calc(${(m.d - 1) / 279 * 100}% + ${12 - 24 * (m.d - 1) / 279}px)`;
+  $("ticks").appendChild(tick);
+  const b = document.createElement("button");
+  b.type = "button"; b.innerHTML = `<b>${Math.floor(m.d / 7)}周</b>${m.t}`;
+  b.addEventListener("click", () => { stop(); setDay(m.d); });
+  $("milestones").appendChild(b);
+  return b;
+});
+
+function updateText(d) {
+  const w = weekOf(d), wk = WEEKS[w], st = stageOf(d);
+  $("dayNum").textContent = d;
+  $("gaText").textContent = `${gaText(d)} · ${d >= 280 ? "今天是预产期" : "距预产期 " + (280 - d) + " 天"}`;
+  slider.setAttribute("aria-valuetext", `第 ${d} 天，${gaText(d)}`);
+  $("hudStage").textContent = st.n;
+  $("hudView").textContent = d < 22 ? "显微视野" : d < 33 ? "子宫内膜" : "宫内视角";
+  const bpm = heartRate(d);
+  $("hudHeart").hidden = !bpm; $("hudBpm").textContent = `胎心约 ${bpm} 次/分`;
+  $("hudAge").textContent = d >= 14 ? `受精后第 ${d - 13} 天` : "尚未受精";
+
+  const tri = d < 98 ? "孕早期" : d < 196 ? "孕中期" : "孕晚期";
+  $("triPill").textContent = tri;
+  $("weekPill").textContent = `怀孕第 ${w} 周`;
+  $("stageTitle").textContent = wk.t;
+  $("stageSummary").textContent = st.s;
+  $("devWeek").textContent = $("momWeek").textContent = `第 ${w} 周 · ${gaText(d)}`;
+
+  // 尺寸
+  let lenLabel = "头臀长", len = "—";
+  if (d < 14) { lenLabel = "卵子直径"; len = "0.1 mm"; }
+  else if (d < 28) { lenLabel = "大小"; len = d < 21 ? "0.1–0.2 mm" : fmtLen(seriesAt(CRL, d, true)); }
+  else if (d < 140) len = fmtLen(seriesAt(CRL, d, true));
+  else { lenLabel = "身长（头顶到脚跟）"; len = fmtLen(seriesAt(CH, d, true)); }
+  $("lenLabel").textContent = lenLabel; $("lenVal").textContent = len;
+  $("wtVal").textContent = d < 50 ? "—" : fmtWt(seriesAt(WT, d, true));
+  $("fruitVal").textContent = wk.f;
+  $("pfVal").textContent = d >= 14 ? `${d - 13} 天` : "未受精";
+
+  $("devList").innerHTML = wk.dev.map(s => `<li>${s}</li>`).join("");
+  $("momList").innerHTML = wk.mom.map(s => `<li>${s}</li>`).join("");
+
+  ORGANS.forEach((o, i) => {
+    const el = organEls[i];
+    const s = d < o.a ? 0 : d < o.b ? 1 : d < o.c ? 2 : 3;
+    const p = d < o.a ? 0 : d < o.b ? .35 * (d - o.a) / (o.b - o.a) : d < o.c ? .35 + .6 * (d - o.b) / (o.c - o.b) : 1;
+    el.dataset.s = s;
+    el.querySelector(".organ-state").textContent = ["未开始", "形成中", "发育中", "基本成熟"][s];
+    el.querySelector(".bar i").style.width = Math.round(p * 100) + "%";
+    el.querySelector(".organ-note").textContent = s === 0 ? `约第 ${Math.ceil(o.a / 7)} 周开始` : o.note[Math.min(2, s - 1)];
+  });
+
+  // 妈妈
+  const fh = d < 84 ? "子宫还在盆腔里，摸不到" : d < 140 ? "耻骨上方能摸到，还在肚脐下" : d < 259 ? `约 ${Math.round(d / 7)} cm（±2 cm）` : "约 32–34 cm，入盆后略下降";
+  $("fundus").textContent = fh;
+  const wf = d / 7;
+  const lo = wf <= 13 ? 0 : .26 * (wf - 13), hi = wf <= 13 ? 2 * wf / 13 : 2 + .48 * (wf - 13);
+  $("gain").textContent = d < 14 ? "保持孕前体重" : `${lo.toFixed(1)}–${hi.toFixed(1)} kg`;
+  $("uterus").textContent = d < 28 ? "和孕前差不多（梨子大小）" : d < 56 ? "像一个橙子" : d < 84 ? "像一个柚子" : d < 140 ? "长出骨盆，像一个小哈密瓜" : d < 224 ? "顶到肚脐以上" : "接近肋骨下缘";
+
+  const now = CHECKS.filter(c => d >= c.a && d <= c.b);
+  const next = CHECKS.find(c => c.a > d);
+  $("checks").innerHTML = now.map(c => `<span class="check"><b>${c.w}</b>${c.t}</span>`).join("") +
+    (next ? `<span class="check next"><b>下一项 · ${next.w}</b>${next.t}</span>` : "") ||
+    `<span class="check next">这一阶段暂无专项检查，按医生安排复诊</span>`;
+
+  msBtns.forEach((b, i) => b.classList.toggle("on", Math.abs(MILESTONES[i].d - d) < 4));
+  drawMom(d);
+}
+
+function frame(d) {
+  const di = clamp(Math.round(d), 1, 280);
+  if (di !== shownDay) { shownDay = di; updateText(di); if (+slider.value !== di) slider.value = di; }
+  renderWomb(clamp(d, 1, 280), clock);
+}
+function setDay(d) { day = clamp(d, 1, 280); frame(day); }
+
+function stop() { playing = false; $("play").textContent = "播放"; $("play").setAttribute("aria-pressed", "false"); }
+function loop(ts) {
+  const dt = lastTs ? Math.min(.1, (ts - lastTs) / 1000) : 0; lastTs = ts;
+  if (!reduceMotion) clock += dt;
+  if (playing) { day += dt * speed; if (day >= 280) { day = 280; stop(); } }
+  frame(day);
+  requestAnimationFrame(loop);
+}
+
+slider.addEventListener("input", () => { stop(); setDay(+slider.value); });
+$("play").addEventListener("click", () => {
+  if (playing) return stop();
+  if (day >= 280) day = 1;
+  playing = true; $("play").textContent = "暂停"; $("play").setAttribute("aria-pressed", "true");
+});
+document.querySelectorAll("[data-speed]").forEach(b => b.addEventListener("click", () => {
+  speed = +b.dataset.speed;
+  document.querySelectorAll("[data-speed]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+}));
+document.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => { stop(); setDay(Math.round(day) + +b.dataset.step); }));
+organEls.forEach(el => el.addEventListener("click", () => el.focus()));
+
+// 末次月经定位
+const lmpIn = $("lmp");
+try { const v = localStorage.getItem("lmp"); if (v) lmpIn.value = v; } catch (e) {}
+$("lmpForm").addEventListener("submit", ev => {
+  ev.preventDefault();
+  if (!lmpIn.value) { $("lmpMsg").textContent = "请先选择末次月经第一天的日期。"; return; }
+  try { localStorage.setItem("lmp", lmpIn.value); } catch (e) {}
+  const start = new Date(lmpIn.value + "T00:00:00"), today = new Date(); today.setHours(0, 0, 0, 0);
+  const ga = Math.round((today - start) / 86400000);
+  const due = new Date(start.getTime() + 280 * 86400000);
+  const dueText = `${due.getFullYear()} 年 ${due.getMonth() + 1} 月 ${due.getDate()} 日`;
+  if (ga < 0) { $("lmpMsg").textContent = "这个日期在今天之后，请检查一下。"; return; }
+  if (ga > 300) { $("lmpMsg").textContent = `按这个日期，预产期是 ${dueText}，已经过去了。`; return; }
+  stop(); setDay(Math.max(1, ga));
+  $("lmpMsg").textContent = `今天是${gaText(ga)}，预产期 ${dueText}。`;
+});
+
+// 主题切换时重画妈妈侧影
+const redrawMom = () => drawMom(shownDay || 1);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redrawMom);
+new MutationObserver(redrawMom).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+new ResizeObserver(() => { sizeWomb(); renderWomb(day, clock); }).observe(womb);
+sizeWomb();
+setDay(Number((location.hash.match(/^#day(\d+)$/) || [])[1]) || 1);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
